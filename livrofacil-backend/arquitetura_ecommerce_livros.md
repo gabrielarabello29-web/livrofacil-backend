@@ -567,7 +567,7 @@ Preferências:
 - Ficção científica
 - Livros de até R$80
 
-Catálogo disponível:
+Catálogo disponível :
 - Livro X
 - Livro Y
 - Livro Z
