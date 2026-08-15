@@ -567,17 +567,18 @@ Preferências:
 - Ficção científica
 - Livros de até R$80
 
-Catálogo disponível:
+Catálogo disponível :
 - Livro X
 - Livro Y
-- Livro Z
+- Livro  Z
 ```
 
-A IA  utiliza  essas informações para produzir recomendações.
+A IA  utiliza  
+essas  informações para produzir recomendações.
 
 ---
 
-# 12.  Front-end
+# 12.  Front- end
 
 Estrutura :
 
