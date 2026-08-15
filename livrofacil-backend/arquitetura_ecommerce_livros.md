@@ -570,7 +570,7 @@ Preferências:
 Catálogo disponível:
 - Livro X
 - Livro Y
-- Livro Z
+- Livro  Z
 ```
 
 A IA  utiliza  essas informações para produzir recomendações.
