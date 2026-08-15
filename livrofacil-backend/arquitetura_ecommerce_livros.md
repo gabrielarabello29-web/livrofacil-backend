@@ -569,8 +569,8 @@ Preferências:
 
 Catálogo disponível:
 - Livro X
-- Livro  Y
-- Livro  Z
+- Livro Y
+- Livro Z
 ```
 
 A IA  utiliza  essas informações para produzir recomendações.
