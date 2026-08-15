@@ -7,14 +7,20 @@ on:
       - develop
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+
 
 jobs:
   create-pr:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Criar PR para develop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
