@@ -574,7 +574,7 @@ Catálogo disponível :
 ```
 
 A IA  utiliza  essas  informações para produzir recomendações.
-
+---
 ---
 
 # 12. Front-end
