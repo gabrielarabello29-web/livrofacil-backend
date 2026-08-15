@@ -579,7 +579,7 @@ A IA utiliza essas informações para produzir recomendações.
 
 # 12. Front-end
 
-Estrutura:
+Estrutura :
 
 ```text
 frontend/
