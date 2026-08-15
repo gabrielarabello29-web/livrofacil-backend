@@ -573,7 +573,7 @@ Catálogo disponível:
 - Livro Z
 ```
 
-A IA  utiliza essas informações para produzir recomendações.
+A IA  utiliza  essas  informações para produzir recomendações.
 
 ---
 
