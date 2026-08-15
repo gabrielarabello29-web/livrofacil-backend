@@ -569,7 +569,7 @@ Preferências:
 
 Catálogo disponível :
 - Livro X
-- Livro  Y
+- Livro Y
 - Livro Z
 ```
 
