@@ -23,7 +23,7 @@ Projeto de um e-commerce de livros baseado nos requisitos fornecidos pelo profes
 | Arquitetura | MVC |
 | Comunicação | API REST / JSON |
 | IA | API de IA generativa, como OpenAI |
-| Autenticação | Spring Security + JWT |
+
 
 A escolha de Java + Spring Boot é adequada para concentrar as regras de negócio, disponibilizar a API REST e integrar o banco e a IA.
 
