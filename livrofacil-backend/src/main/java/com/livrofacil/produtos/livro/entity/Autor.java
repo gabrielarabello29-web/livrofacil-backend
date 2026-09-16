@@ -4,22 +4,16 @@ package com.livrofacil.produtos.livro.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "autores")
+@Table(name = "autor")
 public class Autor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "aut_id")
     private Long id;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "aut_nome", nullable = false, length = 150)
     private String nome;
-
-    public Autor() {
-    }
-
-    public Autor(String nome) {
-        this.nome = nome;
-    }
 
     public Long getId() {
         return id;

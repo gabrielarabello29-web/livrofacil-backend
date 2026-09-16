@@ -5,17 +5,18 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "grupos_precificacao")
+@Table(name = "grupo_precificacao")
 public class GrupoPrecificacao {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "grp_pre_id")
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "grp_pre_nome", nullable = false, unique = true, length = 100)
     private String nome;
 
-    @Column(nullable = false, precision = 5, scale = 2)
+    @Column(name = "grp_pre_percentual_margem", nullable = false, precision = 5, scale = 2)
     private BigDecimal percentualMargem;
 
     public GrupoPrecificacao() {

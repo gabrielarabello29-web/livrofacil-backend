@@ -7,53 +7,57 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "livros")
+@Table(name = "livro")
 public class Livro {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "liv_id")
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(name = "liv_codigo", nullable = false, unique = true, length = 50)
     private String codigo;
 
-    @Column(nullable = false, length = 200)
+    @Column(name = "liv_titulo", nullable = false, length = 200)
     private String titulo;
 
-    @Column(nullable = false)
+    @Column(name = "liv_ano", nullable = false)
     private Integer ano;
 
-    @Column(nullable = false)
+    @Column(name = "liv_edicao", nullable = false)
     private Integer edicao;
 
-    @Column(nullable = false, unique = true, length = 20)
+    @Column(name = "liv_isbn", nullable = false, unique = true, length = 20)
     private String isbn;
 
-    @Column(nullable = false)
+    @Column(name = "liv_numero_paginas", nullable = false)
     private Integer numeroPaginas;
 
-    @Column(nullable = false, length = 5000)
+    @Column(name = "liv_sinopse", nullable = false, length = 5000)
     private String sinopse;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(name = "liv_imagem_url", nullable = false, length = 500)
+    private String imagemUrl;
+
+    @Column(name = "liv_codigo_barras", nullable = false, unique = true, length = 50)
     private String codigoBarras;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "liv_valor_venda", nullable = false, precision = 10, scale = 2)
     private BigDecimal valorVenda;
 
-    @Column(nullable = false)
+    @Column(name = "liv_ativo", nullable = false)
     private Boolean ativo;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "autor_id", nullable = false)
+    @JoinColumn(name = "aut_id", nullable = false)
     private Autor autor;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "editora_id", nullable = false)
+    @JoinColumn(name = "edi_id", nullable = false)
     private Editora editora;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "grupo_precificacao_id", nullable = false)
+    @JoinColumn(name = "grp_pre_id", nullable = false)
     private GrupoPrecificacao grupoPrecificacao;
 
     @Embedded
@@ -62,8 +66,8 @@ public class Livro {
     @ManyToMany
     @JoinTable(
             name = "livro_categoria",
-            joinColumns = @JoinColumn(name = "livro_id"),
-            inverseJoinColumns = @JoinColumn(name = "categoria_id")
+            joinColumns = @JoinColumn(name = "liv_id"),
+            inverseJoinColumns = @JoinColumn(name = "cat_id")
     )
     private Set<Categoria> categorias = new HashSet<>();
 
@@ -78,6 +82,7 @@ public class Livro {
             String isbn,
             Integer numeroPaginas,
             String sinopse,
+            String imagemUrl,
             String codigoBarras,
             BigDecimal valorVenda,
             Boolean ativo,
@@ -93,6 +98,7 @@ public class Livro {
         this.isbn = isbn;
         this.numeroPaginas = numeroPaginas;
         this.sinopse = sinopse;
+        this.imagemUrl = imagemUrl;
         this.codigoBarras = codigoBarras;
         this.valorVenda = valorVenda;
         this.ativo = ativo;
@@ -160,6 +166,14 @@ public class Livro {
 
     public void setSinopse(String sinopse) {
         this.sinopse = sinopse;
+    }
+
+    public String getImagemUrl() {
+        return imagemUrl;
+    }
+
+    public void setImagemUrl(String imagemUrl) {
+        this.imagemUrl = imagemUrl;
     }
 
     public String getCodigoBarras() {

@@ -3,14 +3,15 @@ package com.livrofacil.produtos.livro.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "categorias")
+@Table(name = "categoria")
 public class Categoria {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "cat_id")
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "cat_nome", nullable = false, unique = true, length = 100)
     private String nome;
 
     public Categoria() {

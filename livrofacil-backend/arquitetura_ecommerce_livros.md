@@ -23,9 +23,22 @@ Projeto de um e-commerce de livros baseado nos requisitos fornecidos pelo profes
 | Arquitetura | MVC |
 | Comunicação | API REST / JSON |
 | IA | API de IA generativa, como OpenAI |
-
+| Autenticação | Planejada; ainda não implementada |
 
 A escolha de Java + Spring Boot é adequada para concentrar as regras de negócio, disponibilizar a API REST e integrar o banco e a IA.
+
+## Estado atual da implementação
+
+O backend já possui a estrutura inicial do módulo de clientes, com:
+
+- entidade `Cliente`;
+- DTOs de requisição e resposta;
+- `ClienteRepository` com Spring Data JPA;
+- `ClienteUseCase` para as operações do cadastro;
+- `ClienteController` com API REST;
+- exceção global reutilizável.
+
+O cadastro de cliente é demonstrativo e, neste momento, não possui senha nem regras de validação. Autenticação, endereços, cartões e histórico de transações ainda são etapas futuras.
 
 ---
 
@@ -127,15 +140,15 @@ backend/
     └── main/
         ├── java/
         │   └── com/
-        │       └── ecommerce/
-        │           └── livros/
+      │       └── livrofacil/
         │
-        │               ├── livro/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
+      │               ├── produtos/
+      │               │   └── livro/
+      │               │       ├── controller/ (planejado)
+      │               │       ├── service/
+      │               │       ├── repository/
+      │               │       ├── entity/
+      │               │       └── dto/ (planejado)
         │               │
         │               ├── cliente/
         │               │   ├── controller/
@@ -186,10 +199,10 @@ backend/
         │               ├── exception/
         │               └── config/
         │
-        └── resources/
-            ├── application.properties
-            └── db/
-                └── migration/
+      └── resources/
+         ├── application.properties
+         └── db/
+            └── migration/       (planejado)
 ```
 
 ---
@@ -224,13 +237,12 @@ Responsável por:
 - alteração;
 - inativação;
 - consulta;
-- alteração de senha;
-- endereços;
-- cartões;
-- histórico de transações;
-- ranking do cliente.
+- endereços (planejado);
+- cartões (planejado);
+- histórico de transações (planejado);
+- ranking do cliente (planejado).
 
-Um cliente pode possuir vários endereços e cartões, sendo um cartão definido como preferencial.
+O módulo atual armazena apenas nome, e-mail, CPF e situação de atividade. Futuramente, um cliente poderá possuir vários endereços e cartões, sendo um cartão definido como preferencial.
 
 ---
 
@@ -570,14 +582,14 @@ Preferências:
 Catálogo disponível :
 - Livro X
 - Livro Y
-- Livro  Z
+- Livro Z
 ```
 
 A IA  utiliza  essas  informações para produzir recomendações.
 ---
 ---
 
-# 12.  Front- end
+# 12. Front-end
 
 Estrutura :
 
@@ -652,21 +664,19 @@ PostgreSQL
 
 ---
 
-# 14. Segurança
+# 14. Segurança (planejada)
 
-A autenticação ficará no back-end.
+A autenticação ainda não foi implementada. Quando entrar no escopo do projeto, ficará no back-end.
 
 ```text
 Login
-  ↓
+   ↓
 Spring Security
-  ↓
-Validação
-  ↓
-JWT
-  ↓
-React armazena token
-  ↓
+   ↓
+Validação das credenciais
+   ↓
+Emissão de JWT
+   ↓
 Requisições autenticadas
 ```
 
@@ -760,8 +770,7 @@ GET    /api/clientes
 GET    /api/clientes/{id}
 POST   /api/clientes
 PUT    /api/clientes/{id}
-PATCH  /api/clientes/{id}/inativar
-PATCH  /api/clientes/{id}/senha
+DELETE /api/clientes/{id}       (inativação lógica)
 ```
 
 ## Carrinho
@@ -889,11 +898,7 @@ LOG_TRANSACAO
 
 ### Senha
 
-- mínimo de 8 caracteres;
-- letras maiúsculas;
-- letras minúsculas;
-- caracteres especiais;
-- armazenamento seguro da senha.
+O cadastro de cliente atual é apenas demonstrativo e não possui senha. Regras de senha e armazenamento seguro serão documentados quando a autenticação for implementada.
 
 ---
 
@@ -960,11 +965,11 @@ LOG_TRANSACAO
         ↓
 6. Criar controllers
         ↓
-7. Implementar autenticação
-        ↓
-8. Implementar livros
-        ↓
-9. Implementar clientes
+7. Implementar clientes (CRUD demonstrativo concluído)
+   ↓
+8. Implementar autenticação
+   ↓
+9. Implementar livros
         ↓
 10. Implementar estoque
         ↓

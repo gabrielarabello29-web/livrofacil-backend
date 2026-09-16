@@ -1,2 +1,4 @@
-package com.livrofacil.Service;public class TrocaServiceTest {
+package com.livrofacil.Service;
+
+public class TrocaServiceTest {
 }

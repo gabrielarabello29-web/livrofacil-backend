@@ -1,2 +1,4 @@
-package com.livrofacil.Service;public class IaServiceTest {
+package com.livrofacil.Service;
+
+public class IaServiceTest {
 }

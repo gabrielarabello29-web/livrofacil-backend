@@ -8,16 +8,16 @@ import java.math.BigDecimal;
 @Embeddable
 public class Dimensao {
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "liv_altura", nullable = false, precision = 10, scale = 2)
     private BigDecimal altura;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "liv_largura", nullable = false, precision = 10, scale = 2)
     private BigDecimal largura;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "liv_profundidade", nullable = false, precision = 10, scale = 2)
     private BigDecimal profundidade;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "liv_peso", nullable = false, precision = 10, scale = 2)
     private BigDecimal peso;
 
     public Dimensao() {
