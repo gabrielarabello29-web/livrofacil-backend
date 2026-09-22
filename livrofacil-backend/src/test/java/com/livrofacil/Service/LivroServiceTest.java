@@ -1,13 +1,13 @@
 package com.livrofacil.Service;
 
-import com.livrofacil.produtos.livro.dto.DimensaoRequest;
-import com.livrofacil.produtos.livro.dto.LivroRequest;
-import com.livrofacil.produtos.livro.repository.AutorRepository;
-import com.livrofacil.produtos.livro.repository.CategoriaRepository;
-import com.livrofacil.produtos.livro.repository.EditoraRepository;
-import com.livrofacil.produtos.livro.repository.GrupoPrecificacaoRepository;
-import com.livrofacil.produtos.livro.repository.LivroRepository;
-import com.livrofacil.produtos.livro.service.CadastrarLivroUseCase;
+import com.livrofacil.modulos.livro.dto.DimensaoRequest;
+import com.livrofacil.modulos.livro.dto.LivroRequest;
+import com.livrofacil.modulos.livro.repository.AutorRepository;
+import com.livrofacil.modulos.livro.repository.CategoriaRepository;
+import com.livrofacil.modulos.livro.repository.EditoraRepository;
+import com.livrofacil.modulos.livro.repository.GrupoPrecificacaoRepository;
+import com.livrofacil.modulos.livro.repository.LivroRepository;
+import com.livrofacil.modulos.livro.service.CadastrarLivroUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

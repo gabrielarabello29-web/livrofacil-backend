@@ -1,8 +1,8 @@
 package com.livrofacil.config;
 
-import com.livrofacil.produtos.livro.entity.Estoque;
-import com.livrofacil.produtos.livro.repository.EstoqueRepository;
-import com.livrofacil.produtos.livro.repository.LivroRepository;
+import com.livrofacil.modulos.livro.entity.Estoque;
+import com.livrofacil.modulos.livro.repository.EstoqueRepository;
+import com.livrofacil.modulos.livro.repository.LivroRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
