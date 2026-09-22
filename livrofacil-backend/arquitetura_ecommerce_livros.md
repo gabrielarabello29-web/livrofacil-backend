@@ -23,9 +23,184 @@ Projeto de um e-commerce de livros baseado nos requisitos fornecidos pelo profes
 | Arquitetura | MVC |
 | Comunicação | API REST / JSON |
 | IA | API de IA generativa, como OpenAI |
-| Autenticação | Spring Security + JWT |
+| Autenticação | Planejada; ainda não implementada |
 
 A escolha de Java + Spring Boot é adequada para concentrar as regras de negócio, disponibilizar a API REST e integrar o banco e a IA.
+
+## Estado atual da implementação
+
+O backend já está estruturado em módulos de domínio e segue a separação clássica de responsabilidades em camadas:
+
+- `controller` para expor endpoints REST;
+- `service` para regras de negócio;
+- `repository` para acesso ao banco;
+- `entity` para persistência JPA;
+- `dto` para entrada e saída de dados;
+- `exception` para padronização de erros;
+- `config` para inicialização e suporte de infraestrutura.
+
+A implementação atual do projeto evidencia que a arquitetura já está mais avançada do que uma estrutura inicial genérica. O código real implementa recursos concretos de cliente, livro, carrinho, compra e pagamento.
+
+### Módulos já implementados no código
+
+- `modulos.cliente`: `Cliente`, `Endereco`, `FormaPagamento`, `BandeiraPagamento`
+- `modulos.livro`: `Livro`, `Autor`, `Categoria`, `Editora`, `Estoque`, `GrupoPrecificacao`, `Dimensao`
+- `modulos.compra`: `Carrinho`, `ItemCarrinho`, `Pedido`, `ItemPedido`, `PagamentoPedido`, `Cupom`, `StatusPedido`
+- `modulos.analise`: estrutura inicial de módulo de análise
+- `modulos.estoque`: estrutura operacional do estoque
+- `modulos.troca`: estrutura de trocas agrupada por domínio
+- `modulos.venda`: estrutura de venda e fluxo comercial
+- `ia`: módulo de integração com IA generativa
+- `config`: `ClienteDataInitializer`, `EstoqueDataInitializer`, `CorsConfig`, `CheckoutSchemaMigration`
+- `exception`: `GlobalExceptionHandler`, `RegraDeNegocioException`, `RecursoNaoEncontradoException`
+
+### Entidades JPA implementadas no projeto
+
+Abaixo estão as entidades efetivamente presentes hoje no código Java:
+
+```text
+Cliente
+- cli_id (UUID)
+- cli_numero_registro
+- cli_nome
+- cli_email
+- cli_senha
+- cli_cpf
+- cli_telefone
+- cli_data_cadastro
+- cli_data_nascimento
+- cli_genero
+- cli_ativo
+- cli_data_exclusao
+- cli_dados_anonimizados
+- cli_perfil
+
+Endereco
+- end_id
+- end_tipo
+- end_logradouro
+- end_numero
+- end_complemento
+- end_bairro
+- end_cidade
+- end_estado
+- end_cep
+- end_principal
+- cli_id (FK para Cliente)
+
+FormaPagamento
+- for_pag_id
+- for_pag_nome_titular
+- for_pag_tipo_cartao
+- for_pag_ultimos_digitos
+- for_pag_validade
+- for_pag_bandeira
+- for_pag_preferencial
+- for_pag_ativo
+- for_pag_criado_em
+- cli_id (FK para Cliente)
+
+BandeiraPagamento
+- ban_pag_id
+- ban_pag_nome
+- ban_pag_disponivel
+
+Livro
+- liv_id
+- liv_codigo
+- liv_titulo
+- liv_ano
+- liv_edicao
+- liv_isbn
+- liv_numero_paginas
+- liv_sinopse
+- liv_imagem_url
+- liv_codigo_barras
+- liv_valor_venda
+- liv_ativo
+- aut_id (FK para Autor)
+- edi_id (FK para Editora)
+- grp_pre_id (FK para GrupoPrecificacao)
+- liv_altura
+- liv_largura
+- liv_profundidade
+- liv_peso
+
+Autor
+- aut_id
+- aut_nome
+
+Categoria
+- cat_id
+- cat_nome
+
+Editora
+- edi_id
+- edi_nome
+
+GrupoPrecificacao
+- grp_pre_id
+- grp_pre_nome
+- grp_pre_percentual_margem
+
+Estoque
+- est_id
+- liv_id (FK unica para Livro)
+- est_quantidade_disponivel
+- est_quantidade_bloqueada
+- est_quantidade_vendida
+
+Carrinho
+- car_id
+- car_token
+- cli_id (FK opcional para Cliente)
+- car_atualizado_em
+
+ItemCarrinho
+- ite_car_id
+- car_id (FK para Carrinho)
+- liv_id (FK para Livro)
+- ite_car_quantidade
+
+Pedido
+- ped_id
+- cli_id (FK para Cliente)
+- car_id (FK para Carrinho)
+- ped_checkout_chave
+- ped_status
+- ped_criado_em
+- ped_atualizado_em
+- ped_reserva_expira_em
+- ped_subtotal
+- ped_desconto
+- ped_total
+- ped_cupom
+- ped_entrega_endereco
+- ped_cobranca_endereco
+
+ItemPedido
+- ite_ped_id
+- ped_id (FK para Pedido)
+- liv_id (FK para Livro)
+- ite_ped_titulo
+- ite_ped_quantidade
+- ite_ped_valor_unitario
+
+PagamentoPedido
+- pag_ped_id
+- ped_id (FK para Pedido)
+- for_pag_id (FK para FormaPagamento)
+- pag_ped_valor
+- pag_ped_parcelas
+
+Cupom
+- cup_id
+- cup_codigo
+- cup_percentual_desconto
+- cup_ativo
+```
+
+A estrutura atual mostra que o projeto não é apenas um esqueleto conceitual; ele já contém entidades concretas de domínio e regras de negócio aplicadas em camada de serviço.
 
 ---
 
@@ -122,74 +297,131 @@ Responsável pelo acesso ao banco de dados utilizando JPA/Spring Data.
 # 4. Estrutura do Back-end
 
 ```text
-backend/
-└── src/
-    └── main/
-        ├── java/
-        │   └── com/
-        │       └── ecommerce/
-        │           └── livros/
-        │
-        │               ├── livro/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── cliente/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── carrinho/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── venda/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── estoque/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── troca/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   ├── repository/
-        │               │   ├── entity/
-        │               │   └── dto/
-        │               │
-        │               ├── analise/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   └── dto/
-        │               │
-        │               ├── ai/
-        │               │   ├── controller/
-        │               │   ├── service/
-        │               │   └── dto/
-        │               │
-        │               ├── security/
-        │               ├── exception/
-        │               └── config/
-        │
-        └── resources/
-            ├── application.properties
-            └── db/
-                └── migration/
+livrofacil-backend/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── livrofacil/
+│   │   │           ├── LivrofacilBackendApplication.java
+│   │   │           │
+│   │   │           ├── config/
+│   │   │           │   ├── ClienteDataInitializer.java
+│   │   │           │   ├── CorsConfig.java
+│   │   │           │   ├── CheckoutSchemaMigration.java
+│   │   │           │   └── EstoqueDataInitializer.java
+│   │   │           │
+│   │   │           ├── exception/
+│   │   │           │   ├── GlobalExceptionHandler.java
+│   │   │           │   ├── RecursoNaoEncontradoException.java
+│   │   │           │   └── RegraDeNegocioException.java
+│   │   │           │
+│   │   │           ├── ia/
+│   │   │           │   ├── controller/
+│   │   │           │   ├── dto/
+│   │   │           │   └── service/
+│   │   │           │
+│   │   │           └── modulos/
+│   │   │               ├── analise/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── carrinho/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── cliente/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── compra/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── estoque/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── livro/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               ├── troca/
+│   │   │               │   ├── controller/
+│   │   │               │   ├── dto/
+│   │   │               │   ├── entity/
+│   │   │               │   ├── repository/
+│   │   │               │   └── service/
+│   │   │               │
+│   │   │               └── venda/
+│   │   │                   ├── controller/
+│   │   │                   ├── dto/
+│   │   │                   ├── entity/
+│   │   │                   ├── repository/
+│   │   │                   └── service/
+│   │   │
+│   │   ├── resources/
+│   │   │   ├── application.properties
+│   │   │   └── db/
+│   │   │
+│   │   └── test/
+│   │       └── java/
+│   │           └── com/
+│   │               └── livrofacil/
+│   │                   ├── DtoAccessorsTest.java
+│   │                   ├── ResponseDtoMappingTest.java
+│   │                   ├── exception/
+│   │                   ├── modulos/
+│   │                   └── Service/
+│   │
+│   └── target/
+│
+├── pom.xml
+├── mvnw
+├── mvnw.cmd
+├── HELP.md
+├── README.md
+├── arquitetura_ecommerce_livros.md
+├── estrutura.md
+└── .gitignore
+```
+
+### Observação de arquitetura atual
+
+A estrutura real do projeto não está mais apenas em um modelo conceitual de módulos; ela representa, na prática, uma organização em subdomínios com relacionamento direto entre entidades de negócio. Isso aparece claramente nos módulos de cliente, livro e compra.
+
+A arquitetura já está seguindo um modelo de negócios que pode ser descrito como:
+
+```text
+Controller -> UseCase/Service -> Repository -> JPA Entity -> PostgreSQL
+```
+
+E, em alguns fluxos, como carrinho e pedido, há o relacionamento entre módulos e entidades de domínio, por exemplo:
+
+```text
+Cliente 1 ── N Endereco
+Cliente 1 ── N FormaPagamento
+Cliente 1 ── 1 Carrinho
+Carrinho 1 ── N ItemCarrinho
+Pedido N ── 1 Cliente
+Pedido 1 ── N ItemPedido
+Pedido 1 ── N PagamentoPedido
 ```
 
 ---
@@ -198,74 +430,527 @@ backend/
 
 ## 5.1 Livros
 
-Responsável por:
+Módulo responsável pelo cadastro, consulta e manutenção do catálogo de livros.
 
-- cadastrar livros;
-- alterar livros;
-- ativar/inativar livros;
-- consultar livros;
-- categorias;
-- autores;
-- editoras;
-- grupo de precificação;
-- código único;
-- código de barras;
-- cálculo do valor de venda.
+### Implementado no código
 
-O requisito determina dados obrigatórios como autor, categoria, ano, título, editora, edição, ISBN, páginas, sinopse, dimensões, grupo de precificação e código de barras.
+- `Livro` como entidade principal;
+- `Autor`, `Editora`, `Categoria`, `GrupoPrecificacao` como dados auxiliares;
+- `Dimensao` como valor embutido em `Livro`;
+- `Estoque` com quantidade disponível, bloqueada e vendida;
+- `LivroController` com endpoints REST para CRUD e busca;
+- `CadastrarLivroUseCase` com regras de cadastro, consulta, ativação e atualização;
+- DTOs específicos: `LivroRequest`, `LivroResponse`, `EstoqueRequest`, `EstoqueResponse`.
+
+### Entidades e relacionamento do módulo de livro
+
+```text
+Autor      1 ── N Livro
+Editora    1 ── N Livro
+Categoria  N ── N Livro
+Livro      1 ── 1 Estoque
+GrupoPrecificacao 1 ── N Livro
+Livro      possui Dimensao embutida
+```
+
+### Campos importantes do módulo de livro
+
+- código único
+- título
+- ano
+- edição
+- ISBN
+- número de páginas
+- sinopse
+- URL da imagem
+- código de barras
+- valor de venda
+- status ativo/inativo
+- autor
+- editora
+- grupo de precificação
+- categorias
+- dimensões
+
+Esse módulo está bem alinhado com o requisito do e-commerce e já está materializado no código.
 
 ---
 
 ## 5.2 Clientes
 
-Responsável por:
+Este módulo está implementado com estrutura concreta em controllers, services, entity e DTOs. O documento deve refletir os nomes reais existentes no projeto.
 
-- cadastro;
-- alteração;
-- inativação;
-- consulta;
+### Controllers reais do módulo cliente
+
+```text
+src/main/java/com/livrofacil/modulos/cliente/controller/
+├── ClienteController.java
+├── EnderecoController.java
+├── FormaPagamentoController.java
+└── BandeiraPagamentoController.java
+```
+
+### ClienteController
+
+Base URL real:
+
+```text
+/api/clientes
+```
+
+Endpoints implementados:
+
+```text
+POST   /api/clientes
+GET    /api/clientes
+GET    /api/clientes/buscar
+GET    /api/clientes/{id}
+POST   /api/clientes/login
+PUT    /api/clientes/{id}
+PATCH  /api/clientes/{id}/senha
+DELETE /api/clientes/{id}
+```
+
+Responsabilidades reais:
+
+- cadastro do cliente;
+- busca por filtros (nome, email, cpf, telefone, dataNascimento, gênero, endereço, cidade, estado, cep);
+- autenticação de login simples por e-mail e senha;
+- atualização de dados cadastrais;
 - alteração de senha;
-- endereços;
-- cartões;
-- histórico de transações;
-- ranking do cliente.
+- inativação lógica do cliente.
 
-Um cliente pode possuir vários endereços e cartões, sendo um cartão definido como preferencial.
+### EnderecoController
+
+Base URL real:
+
+```text
+/api/clientes/{clienteId}/enderecos
+```
+
+Endpoints implementados:
+
+```text
+POST   /api/clientes/{clienteId}/enderecos
+GET    /api/clientes/{clienteId}/enderecos
+GET    /api/clientes/{clienteId}/enderecos/{enderecoId}
+PUT    /api/clientes/{clienteId}/enderecos/{enderecoId}
+DELETE /api/clientes/{clienteId}/enderecos/{enderecoId}
+```
+
+Responsabilidade real:
+
+- cadastrar, listar, buscar, atualizar e remover endereços vinculados ao cliente;
+- marcar um endereço como principal;
+- garantir que apenas um endereço principal seja ativo por cliente quando necessário.
+
+### FormaPagamentoController
+
+Base URL real:
+
+```text
+/api/clientes/{clienteId}/formas-pagamento
+```
+
+Endpoints implementados:
+
+```text
+POST   /api/clientes/{clienteId}/formas-pagamento
+GET    /api/clientes/{clienteId}/formas-pagamento
+GET    /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}
+PUT    /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}
+PATCH  /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}/preferencial
+DELETE /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}
+DELETE /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}/excluir
+PATCH  /api/clientes/{clienteId}/formas-pagamento/{formaPagamentoId}/reativar
+```
+
+Responsabilidade real:
+
+- cadastro de cartão do cliente;
+- listagem em ordem asc/desc;
+- definição de cartão preferencial;
+- inativação e reativação do cartão;
+- exclusão definitiva quando não há histórico de uso.
+
+### BandeiraPagamentoController
+
+Base URL real:
+
+```text
+/api/pagamentos/bandeiras
+```
+
+Endpoints implementados:
+
+```text
+GET   /api/pagamentos/bandeiras
+PATCH /api/pagamentos/bandeiras/{id}
+```
+
+Responsabilidade real:
+
+- listar bandeiras disponíveis;
+- ativar/desativar bandeira no sistema.
+
+### Entidades do módulo cliente realmente existentes
+
+```text
+Cliente
+Endereco
+FormaPagamento
+BandeiraPagamento
+```
+
+### Relacionamentos reais do módulo cliente
+
+```text
+Cliente 1 ── N Endereco
+Cliente 1 ── N FormaPagamento
+Cliente 1 ── 1 Carrinho
+Cliente 1 ── N Pedido
+```
+
+### Regras de negócio implementadas no código cliente
+
+- validação de e-mail, CPF e telefone únicos;
+- senha com regra mínima de força;
+- confirmação de senha;
+- maioridade mínima;
+- inativação lógica e anonimização posterior;
+- atualização de senha separada do restante do cadastro;
+- cartão preferencial por cliente;
+- bandeira de cartão obrigatória e disponível;
+- prevenção de exclusão de cartão em uso em histórico de pedidos.
+
+### O que ainda não está implementado no módulo cliente
+
+- autenticação com JWT/Spring Security;
+- criptografia real de senha;
+- cadastro de múltiplos perfis administrativos com autorização real;
+- histórico de transações do cliente;
+- ranking do cliente.
 
 ---
 
 ## 5.3 Carrinho
 
-Responsável por:
+Módulo responsável por armazenar os itens selecionados pelo cliente antes da finalização da compra.
 
-- adicionar livro;
-- remover livro;
-- alterar quantidade;
-- visualizar itens;
-- validar estoque;
-- bloquear temporariamente itens;
-- controlar prazo de bloqueio;
-- liberar estoque quando o prazo expirar.
+### Implementado no código
 
-Fluxo:
+- `Carrinho` como entidade principal;
+- `ItemCarrinho` como associação entre carrinho e livro;
+- `CarrinhoController` para criar e consultar carrinho;
+- `CarrinhoService` para adicionar, alterar e remover itens;
+- `CriarCarrinhoRequest`, `ItemCarrinhoRequest`, `ItemCarrinhoResponse`.
+
+### Relacionamentos reais
 
 ```text
-Cliente
-   ↓
-Adicionar livro
-   ↓
-Validar estoque
-   ↓
-Bloquear estoque
-   ↓
-Adicionar ao carrinho
-   ↓
-Finalizar compra
+Carrinho 1 ── N ItemCarrinho
+Carrinho N ── 1 Cliente
+ItemCarrinho N ── 1 Livro
 ```
+
+### Regras implementadas no carrinho
+
+- criação ou associação de carrinho por token ou cliente;
+- adição de livro ao carrinho;
+- validação de livro ativo antes da compra;
+- atualização da quantidade por item;
+- remoção de item do carrinho;
+- controle de data de atualização do carrinho;
+- verificação de pertencimento do carrinho ao cliente informado.
+
+### O que ainda falta no fluxo de carrinho
+
+- bloqueio de estoque em tempo real;
+- expiração automática do carrinho;
+- cálculo de frete;
+- regras de cupom vinculadas ao carrinho;
+- finalização integrada com fluxo de pagamento completo.
 
 ---
 
-## 5.4 Venda
+## 5.4 Compra / Pedido
+
+Módulo responsável pelo fechamento do pedido e pelo fluxo de pagamento.
+
+### Entidades implementadas
+
+- `Pedido`
+- `ItemPedido`
+- `PagamentoPedido`
+- `Cupom`
+- `StatusPedido`
+
+### Relacionamentos reais
+
+```text
+Cliente 1 ── N Pedido
+Carrinho 1 ── 1 Pedido
+Pedido 1 ── N ItemPedido
+Pedido 1 ── N PagamentoPedido
+Pedido N ── 1 FormaPagamento
+```
+
+### Status do pedido já definidos no código
+
+```text
+PENDENTE
+AGUARDANDO_PAGAMENTO
+EM_CHECKOUT
+EM_PROCESSAMENTO
+PAGAMENTO_APROVADO
+EM_SEPARACAO
+NA_TRANSPORTADORA
+EM_ROTA_DE_ENTREGA
+ENTREGUE
+FINALIZADO
+CANCELADO
+```
+
+### Implementado
+
+- criação do pedido e associação ao cliente/carrinho;
+- status do pedido;
+- subtotal, desconto e total;
+- armazenamento de endereço de entrega e cobrança;
+- itens do pedido com valor unitário e quantidade;
+- pagamento vinculado ao pedido;
+- estrutura base de cupom e desconto;
+- controller REST para pedido e carrinho.
+
+### Ainda não implementado no fluxo de compra
+
+- validação real de pagamento junto a operadora;
+- geração automática de nota fiscal;
+- confirmação de pagamento e liberação de estoque real;
+- integração com logística e rastreio de entrega;
+- regra de devolução/troca completa.
+
+---
+
+## 5.5 Estoque
+
+Módulo responsável por controlar a quantidade disponível do produto e o movimento de venda.
+
+### Entidade principal implementada
+
+- `Estoque`
+
+### Campos da entidade
+
+- id
+- livro
+- quantidadeDisponivel
+- quantidadeBloqueada
+- quantidadeVendida
+
+### Relacionamento real
+
+```text
+Livro 1 ── 1 Estoque
+```
+
+### O que está em uso
+
+- controle de quantidade disponível;
+- quantidade bloqueada;
+- quantidade vendida;
+- associação direta com `Livro`.
+
+### Ainda não implementado
+
+- registro de entrada de estoque por fornecedor;
+- histórico de movimentações;
+- controle de custos por lote;
+- baixa de estoque por movimentação real e auditoria.
+
+---
+
+## 5.6 Troca / devolução
+
+Estrutura de domínio prevista, mas ainda não consolidada em fluxo real de negócio.
+
+### O que existe no projeto
+
+- módulo `troca` presente na estrutura do projeto;
+- modelos organizados por domínio, mas sem implementação funcional completa em `controller`, `service` e `repository` verificáveis.
+
+### Fluxo esperado
+
+```text
+Pedido entregue
+   ↓
+Solicitação de troca
+   ↓
+Validação da troca
+   ↓
+Autorização
+   ↓
+Recebimento do produto
+   ↓
+Atualização do status
+```
+
+Ainda está como evolução futura do sistema.
+
+---
+
+## 5.7 Análise / relatórios
+
+Estrutura prevista para gerar relatórios administrativos.
+
+### O que existe
+
+- módulo `analise` com controller, dto e service;
+- base para relatórios de vendas.
+
+### Objetivo esperado
+
+- consultar volume de vendas por período;
+- agrupar por categoria e mês;
+- alimentar dashboard administrativo.
+
+### Ainda não implementado
+
+- consulta real e agrupada por período e categoria;
+- geração de gráfico ou painel analítico final.
+
+---
+
+## 5.8 IA Generativa
+
+Módulo de integração com IA para comportamento do chatbot e recomendações.
+
+### O que existe no código
+
+- pacote `ia` com `controller`, `service` e `dto`;
+- estrutura base para interação com modelo externo.
+
+### Objetivo arquitetural
+
+```text
+React / Front-end
+   ↓
+REST API
+   ↓
+IA Controller
+   ↓
+IA Service
+   ↓
+OpenAI / modelo externo
+```
+
+### Ainda não implementado
+
+- integração real com API da OpenAI;
+- contexto do cliente e catálogo para recomendações;
+- chat funcional completo;
+- autenticação e contexto de usuário para IA.
+
+---
+
+# 6. Mapa de relacionamento entre entidades
+
+A arquitetura atual do backend pode ser representada pelos principais vínculos abaixo:
+
+```text
+CLIENTE
+  ├── ENDERECO (1:N)
+  ├── FORMA_PAGAMENTO (1:N)
+  ├── CARRINHO (1:1)
+  └── PEDIDO (1:N)
+
+LIVRO
+  ├── AUTOR (N:1)
+  ├── EDITORA (N:1)
+  ├── GRUPO_PRECIFICACAO (N:1)
+  ├── CATEGORIA (N:N)
+  └── ESTOQUE (1:1)
+
+CARRINHO
+  └── ITEM_CARRINHO (1:N)
+
+PEDIDO
+  ├── ITEM_PEDIDO (1:N)
+  ├── PAGAMENTO_PEDIDO (1:N)
+  └── CUPOM (N:1 ou uso local)
+```
+
+Essa representação resume bem a modelagem de domínio que já está presente no código.
+
+---
+
+# 7. Camadas de arquitetura da aplicação
+
+```text
+FRONT-END (React)
+        ↓
+REST API
+        ↓
+CONTROLLER
+        ↓
+SERVICE / USE CASE
+        ↓
+REPOSITORY
+        ↓
+ENTITY / JPA
+        ↓
+POSTGRESQL
+```
+
+Esse fluxo está em linha com a implementação atual: o backend se comunica com o banco via JPA e expõe endpoints REST para o front-end.
+
+---
+
+# 8. Estado real da implementação
+
+O projeto está em um estágio de evolução tecnológica e funcional interessante:
+
+### Já implementado
+
+- estrutura modular por domínio;
+- entidades de cliente, livro, carrinho, pedido e pagamento;
+- DTOs e controllers REST;
+- regras de validação de dados;
+- uso de JPA e Spring Data;
+- tratamento de exceções centralizado;
+- cenário básico de compra e produto.
+
+### Ainda em desenvolvimento / não implementado
+
+- autenticação e autorização real;
+- segurança de senha em hash;
+- integrações com gateway de pagamento;
+- log de transações;
+- dashboard analítico e relatórios fiscais;
+- IA funcional com contexto real do cliente;
+- fluxo completo de trocas e logística.
+
+---
+
+# 9. Conclusão da arquitetura atual
+
+A arquitetura do backend de `livrofacil` já está organizada por módulos reais do negócio e não apenas por uma proposta genérica. O código representa uma base sólida para e-commerce de livros com foco em:
+
+- cliente;
+- catálogo de livros;
+- carrinho;
+- compra e pedido;
+- estoque;
+- formas de pagamento;
+- integração de IA e análise.
+
+Em outras palavras, o sistema já saiu do estágio de rascunho conceitual e está seguindo uma modelagem de domínio concreta, porém com alguns pontos de extensão e segurança ainda pendentes.
+
+---
+
+# 10. Resumo executivo
+
+O backend atual apresenta uma arquitetura típica de Spring Boot com separação por módulos e entidades. O que já existe no código é muito mais concreto do que o documento inicial indicava e está pronto para servir como base para apresentação acadêmica e evolução futura.
 
 Responsável por:
 
@@ -570,15 +1255,14 @@ Preferências:
 Catálogo disponível :
 - Livro X
 - Livro Y
-- Livro  Z
+- Livro Z
 ```
 
-A IA  utiliza  
-essas  informações para produzir recomendações.
-
+A IA  utiliza  essas  informações para produzir recomendações.
+---
 ---
 
-# 12.  Front- end
+# 12. Front-end
 
 Estrutura :
 
@@ -653,21 +1337,19 @@ PostgreSQL
 
 ---
 
-# 14. Segurança
+# 14. Segurança (planejada)
 
-A autenticação ficará no back-end.
+A autenticação ainda não foi implementada. Quando entrar no escopo do projeto, ficará no back-end.
 
 ```text
 Login
-  ↓
+   ↓
 Spring Security
-  ↓
-Validação
-  ↓
-JWT
-  ↓
-React armazena token
-  ↓
+   ↓
+Validação das credenciais
+   ↓
+Emissão de JWT
+   ↓
 Requisições autenticadas
 ```
 
@@ -756,14 +1438,29 @@ PATCH  /api/livros/{id}/inativar
 
 ## Clientes
 
+A implementação real do módulo cliente possui os seguintes endpoints e estruturas em `controller` e `service`:
+
 ```text
-GET    /api/clientes
-GET    /api/clientes/{id}
 POST   /api/clientes
+GET    /api/clientes
+GET    /api/clientes/buscar
+GET    /api/clientes/{id}
+POST   /api/clientes/login
 PUT    /api/clientes/{id}
-PATCH  /api/clientes/{id}/inativar
 PATCH  /api/clientes/{id}/senha
+DELETE /api/clientes/{id}
 ```
+
+Os controllers reais do cliente são:
+
+```text
+ClienteController.java
+EnderecoController.java
+FormaPagamentoController.java
+BandeiraPagamentoController.java
+```
+
+Esses endpoints refletem exatamente o que foi implementado no código e não o padrão genérico do documento inicial.
 
 ## Carrinho
 
@@ -890,11 +1587,7 @@ LOG_TRANSACAO
 
 ### Senha
 
-- mínimo de 8 caracteres;
-- letras maiúsculas;
-- letras minúsculas;
-- caracteres especiais;
-- armazenamento seguro da senha.
+O cadastro de cliente atual é apenas demonstrativo e não possui senha. Regras de senha e armazenamento seguro serão documentados quando a autenticação for implementada.
 
 ---
 
@@ -961,11 +1654,11 @@ LOG_TRANSACAO
         ↓
 6. Criar controllers
         ↓
-7. Implementar autenticação
-        ↓
-8. Implementar livros
-        ↓
-9. Implementar clientes
+7. Implementar clientes (CRUD demonstrativo concluído)
+   ↓
+8. Implementar autenticação
+   ↓
+9. Implementar livros
         ↓
 10. Implementar estoque
         ↓
