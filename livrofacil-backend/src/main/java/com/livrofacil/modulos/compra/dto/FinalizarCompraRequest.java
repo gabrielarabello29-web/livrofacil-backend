@@ -1,7 +1,6 @@
 package com.livrofacil.modulos.compra.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -13,7 +12,7 @@ public class FinalizarCompraRequest {
     private Long carrinhoId;
 
     @Valid
-    @NotEmpty(message = "Informe pelo menos uma forma de pagamento")
+    @NotNull(message = "Informe as formas de pagamento")
     private List<PagamentoRequest> pagamentos;
 
     public List<PagamentoRequest> getPagamentos() { return pagamentos; }

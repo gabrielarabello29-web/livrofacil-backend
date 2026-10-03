@@ -13,6 +13,8 @@ import com.livrofacil.exception.RecursoNaoEncontradoException;
 import com.livrofacil.exception.RegraDeNegocioException;
 import com.livrofacil.modulos.livro.entity.Estoque;
 import com.livrofacil.modulos.livro.repository.EstoqueRepository;
+import com.livrofacil.modulos.troca.entity.VoucherTroca;
+import com.livrofacil.modulos.troca.repository.VoucherTrocaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -49,6 +51,7 @@ public class PedidoService {
     private final EstoqueRepository estoqueRepository;
     private final CupomRepository cupomRepository;
     private final BandeiraPagamentoRepository bandeiraPagamentoRepository;
+    private final VoucherTrocaRepository voucherTrocaRepository;
     private final long expiracaoCheckoutMinutos;
 
     public PedidoService(PedidoRepository pedidoRepository, CarrinhoRepository carrinhoRepository,
@@ -56,6 +59,7 @@ public class PedidoService {
                          FormaPagamentoRepository formaPagamentoRepository, EstoqueRepository estoqueRepository,
                          CupomRepository cupomRepository,
                          BandeiraPagamentoRepository bandeiraPagamentoRepository,
+                         VoucherTrocaRepository voucherTrocaRepository,
                          @Value("${livrofacil.checkout.expiracao-minutos:30}") long expiracaoCheckoutMinutos) {
         this.pedidoRepository = pedidoRepository;
         this.carrinhoRepository = carrinhoRepository;
@@ -65,6 +69,7 @@ public class PedidoService {
         this.estoqueRepository = estoqueRepository;
         this.cupomRepository = cupomRepository;
         this.bandeiraPagamentoRepository = bandeiraPagamentoRepository;
+        this.voucherTrocaRepository = voucherTrocaRepository;
         this.expiracaoCheckoutMinutos = expiracaoCheckoutMinutos;
     }
 
@@ -130,8 +135,15 @@ public class PedidoService {
             || pedido.getReservaExpiraEm().isBefore(LocalDateTime.now())) {
             throw new RegraDeNegocioException("A reserva do pedido expirou ou nao esta mais disponivel");
         }
+        VoucherTroca voucherResgate = buscarVoucherAplicadoParaResgate(pedido, clienteId);
         Carrinho carrinho = carrinhoRepository.findByIdAndClienteId(request.getCarrinhoId(), clienteId)
             .orElseThrow(() -> new RecursoNaoEncontradoException("Carrinho nao encontrado para o cliente"));
+        if (request.getPagamentos().isEmpty() && pedido.getTotal().signum() > 0) {
+            throw new RegraDeNegocioException("Informe pelo menos uma forma de pagamento");
+        }
+        if (!request.getPagamentos().isEmpty() && pedido.getTotal().signum() == 0) {
+            throw new RegraDeNegocioException("O pedido ja esta totalmente coberto pelo voucher");
+        }
         BigDecimal soma = BigDecimal.ZERO;
         BigDecimal totalComJuros = BigDecimal.ZERO;
         for (PagamentoRequest pagamento : request.getPagamentos()) {
@@ -159,6 +171,11 @@ public class PedidoService {
         if (soma.compareTo(pedido.getTotal()) != 0) throw new RegraDeNegocioException("A soma dos pagamentos deve ser igual ao total do pedido");
         pedido.setTotal(totalComJuros.setScale(2, RoundingMode.HALF_UP));
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
+        if (voucherResgate != null) {
+            voucherResgate.setPedidoResgate(pedido);
+            voucherResgate.setResgatadoEm(LocalDateTime.now());
+            voucherTrocaRepository.save(voucherResgate);
+        }
         pedido.setCheckoutChave(null);
         pedido.atualizarAtividade();
         pedido.setReservaExpiraEm(null);
@@ -169,6 +186,35 @@ public class PedidoService {
         }));
         carrinho.getItens().clear();
         carrinhoRepository.save(carrinho);
+        return new PedidoResponse(pedidoRepository.save(pedido));
+    }
+
+    @Transactional
+    public PedidoResponse aplicarCupom(Long pedidoId, UUID clienteId, String codigo) {
+        Pedido pedido = buscarPedidoCliente(pedidoId, clienteId);
+        if (!STATUS_CHECKOUT_PENDENTE.contains(pedido.getStatus())
+                || pedido.getReservaExpiraEm() == null
+                || pedido.getReservaExpiraEm().isBefore(LocalDateTime.now())) {
+            throw new RegraDeNegocioException("A reserva do pedido expirou ou nao esta mais disponivel");
+        }
+        String codigoNormalizado = codigo == null ? "" : codigo.trim();
+        var cupom = cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(codigoNormalizado);
+        BigDecimal desconto;
+        String codigoAplicado;
+        if (cupom.isPresent()) {
+            codigoAplicado = cupom.get().getCodigo();
+            desconto = calcularDesconto(codigoAplicado, pedido.getSubtotal());
+        } else {
+            VoucherTroca voucher = voucherTrocaRepository.findByCodigoIgnoreCase(codigoNormalizado)
+                .orElseThrow(() -> new RegraDeNegocioException("Cupom ou voucher invalido"));
+            validarVoucher(voucher, pedido, clienteId);
+            codigoAplicado = voucher.getCodigo();
+            desconto = voucher.getValor().min(pedido.getSubtotal());
+        }
+        pedido.setCupom(codigoAplicado);
+        pedido.setDesconto(desconto);
+        pedido.setTotal(pedido.getSubtotal().subtract(desconto).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        pedido.atualizarAtividade();
         return new PedidoResponse(pedidoRepository.save(pedido));
     }
 
@@ -272,7 +318,29 @@ public class PedidoService {
     private BigDecimal calcularDesconto(String codigo, BigDecimal subtotal) {
         if (codigo == null || codigo.isBlank()) return BigDecimal.ZERO;
         Cupom cupom = cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(codigo).orElseThrow(() -> new RegraDeNegocioException("Cupom invalido ou inativo"));
-        return subtotal.multiply(cupom.getPercentualDesconto()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return subtotal.multiply(cupom.getPercentualDesconto()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+            .min(subtotal).max(BigDecimal.ZERO);
+    }
+
+    private VoucherTroca buscarVoucherAplicadoParaResgate(Pedido pedido, UUID clienteId) {
+        if (pedido.getCupom() == null
+                || cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(pedido.getCupom()).isPresent()) {
+            return null;
+        }
+        VoucherTroca voucher = voucherTrocaRepository.findByCodigoForUpdate(pedido.getCupom())
+                .orElseThrow(() -> new RegraDeNegocioException("Voucher aplicado nao esta mais disponivel"));
+        validarVoucher(voucher, pedido, clienteId);
+        return voucher;
+    }
+
+    private void validarVoucher(VoucherTroca voucher, Pedido pedido, UUID clienteId) {
+        if (!voucher.getCliente().getId().equals(clienteId)
+                || !voucher.getCliente().getId().equals(pedido.getCliente().getId())) {
+            throw new RegraDeNegocioException("Este voucher pertence a outro cliente");
+        }
+        if (voucher.getResgatadoEm() != null) {
+            throw new RegraDeNegocioException("Este voucher ja foi utilizado");
+        }
     }
     private String formatarEndereco(Endereco endereco) {
         return endereco.getLogradouro() + ", " + endereco.getNumero() + " - " + endereco.getBairro() + ", " + endereco.getCidade() + "/" + endereco.getEstado() + " - CEP " + endereco.getCep();

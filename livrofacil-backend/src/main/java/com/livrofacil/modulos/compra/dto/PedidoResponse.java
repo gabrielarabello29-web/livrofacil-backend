@@ -23,6 +23,7 @@ public class PedidoResponse {
     private String enderecoEntrega;
     private String enderecoCobranca;
     private List<ItemPedidoResponse> itens;
+    private List<PagamentoPedidoResponse> pagamentos;
 
     public PedidoResponse(Pedido pedido) {
         this.id = pedido.getId();
@@ -39,6 +40,7 @@ public class PedidoResponse {
         this.enderecoEntrega = pedido.getEnderecoEntrega();
         this.enderecoCobranca = pedido.getEnderecoCobranca();
         this.itens = pedido.getItens().stream().map(ItemPedidoResponse::new).toList();
+        this.pagamentos = pedido.getPagamentos().stream().map(PagamentoPedidoResponse::new).toList();
     }
     public Long getId() { return id; }
     public UUID getClienteId() { return clienteId; }
@@ -54,4 +56,5 @@ public class PedidoResponse {
     public String getEnderecoEntrega() { return enderecoEntrega; }
     public String getEnderecoCobranca() { return enderecoCobranca; }
     public List<ItemPedidoResponse> getItens() { return itens; }
+    public List<PagamentoPedidoResponse> getPagamentos() { return pagamentos; }
 }

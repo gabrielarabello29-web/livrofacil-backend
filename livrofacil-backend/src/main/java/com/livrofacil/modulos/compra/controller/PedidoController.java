@@ -28,6 +28,12 @@ public class PedidoController {
         return ResponseEntity.ok(service.finalizar(pedidoId, clienteId, request));
     }
 
+    @PostMapping("/{pedidoId}/cupons")
+    public ResponseEntity<PedidoResponse> aplicarCupom(@PathVariable Long pedidoId, @RequestParam UUID clienteId,
+                                                         @Valid @RequestBody AplicarCupomRequest request) {
+        return ResponseEntity.ok(service.aplicarCupom(pedidoId, clienteId, request.getCodigo()));
+    }
+
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<PedidoResponse>> listarCliente(@PathVariable UUID clienteId) {
         return ResponseEntity.ok(service.listarCliente(clienteId));
