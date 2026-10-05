@@ -44,7 +44,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +90,7 @@ class PedidoServiceTest {
         var response = service.iniciar(request);
 
         assertEquals(new BigDecimal("10"), response.getSubtotal());
-        assertEquals(new BigDecimal("10.00"), response.getTotal());
+        assertEquals(new BigDecimal("29.90"), response.getTotal());
         assertEquals(9, estoque.getQuantidadeDisponivel());
         assertEquals(1, estoque.getQuantidadeBloqueada());
         verify(estoqueRepository).save(estoque);
@@ -105,6 +107,11 @@ class PedidoServiceTest {
         when(enderecoRepository.findByIdAndClienteId(2L, clienteId)).thenReturn(Optional.of(endereco()));
         when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque(5, 0, 0)));
         when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("DESC10")).thenReturn(Optional.of(cupom));
+        lenient().when(cupom.getAtivo()).thenReturn(true);
+        lenient().when(cupom.getTipoDesconto()).thenReturn("PERCENTUAL");
+        lenient().when(cupom.getDataFimVigencia()).thenReturn(null);
+        lenient().when(cupom.getNumeroUsoMaximo()).thenReturn(null);
+        lenient().when(cupom.getNumeroUsoAtual()).thenReturn(0);
         when(cupom.getPercentualDesconto()).thenReturn(new BigDecimal("10"));
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
         IniciarCompraRequest request = iniciarRequest();
@@ -113,7 +120,7 @@ class PedidoServiceTest {
         var response = service.iniciar(request);
 
         assertEquals(new BigDecimal("1.00"), response.getDesconto());
-        assertEquals(new BigDecimal("9.00"), response.getTotal());
+        assertEquals(new BigDecimal("28.90"), response.getTotal());
     }
 
     @Test
@@ -125,6 +132,11 @@ class PedidoServiceTest {
         when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
         when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("DESC10")).thenReturn(Optional.of(cupom));
         when(cupom.getCodigo()).thenReturn("DESC10");
+        lenient().when(cupom.getAtivo()).thenReturn(true);
+        lenient().when(cupom.getTipoDesconto()).thenReturn("PERCENTUAL");
+        lenient().when(cupom.getDataFimVigencia()).thenReturn(null);
+        lenient().when(cupom.getNumeroUsoMaximo()).thenReturn(null);
+        lenient().when(cupom.getNumeroUsoAtual()).thenReturn(0);
         when(cupom.getPercentualDesconto()).thenReturn(new BigDecimal("10"));
         when(pedidoRepository.save(pedido)).thenReturn(pedido);
 
@@ -133,6 +145,61 @@ class PedidoServiceTest {
         assertEquals("DESC10", response.getCupom());
         assertEquals(new BigDecimal("10.00"), response.getDesconto());
         assertEquals(new BigDecimal("90.00"), response.getTotal());
+    }
+
+    @Test
+    void deveRegistrarUsoDeCupomSomenteAoFinalizarPedido() throws Exception {
+        Pedido pedido = pedidoBase();
+        pedido.setSubtotal(new BigDecimal("20.00"));
+        pedido.setDesconto(BigDecimal.ZERO);
+        pedido.setTotal(new BigDecimal("20.00"));
+        pedido.setCupom("DESC10");
+        Cupom cupom = new Cupom();
+        cupom.setCodigo("DESC10");
+        cupom.setTipoDesconto("PERCENTUAL");
+        cupom.setPercentualDesconto(new BigDecimal("10.00"));
+        cupom.setNumeroUsoAtual(0);
+        cupom.setAtivo(true);
+        FormaPagamento forma = new FormaPagamento("Cliente", "CREDITO", "4444", "12/28", "VISA", false, pedido.getCliente());
+        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("DESC10")).thenReturn(Optional.of(cupom));
+        when(cupomRepository.findByCodigoIgnoreCaseForUpdate("DESC10")).thenReturn(Optional.of(cupom));
+        when(carrinhoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido.getCarrinho()));
+        when(formaPagamentoRepository.findByIdAndClienteId(4L, clienteId)).thenReturn(Optional.of(forma));
+        when(bandeiraPagamentoRepository.findByNomeIgnoreCase("VISA")).thenReturn(Optional.of(new BandeiraPagamento("VISA")));
+        when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque(0, 1, 0)));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.aplicarCupom(1L, clienteId, "DESC10");
+        assertEquals(0, cupom.getNumeroUsoAtual());
+
+        service.finalizar(1L, clienteId, finalizarRequest(new BigDecimal("18.00"), 1));
+
+        assertEquals(1, cupom.getNumeroUsoAtual());
+    }
+
+    @Test
+    void deveAplicarVoucherSemMarcarComoResgatado() throws Exception {
+        Pedido pedido = pedidoBase();
+        pedido.setSubtotal(new BigDecimal("10.00"));
+        pedido.setTotal(new BigDecimal("10.00"));
+        Cliente cliente = pedido.getCliente();
+        setId(cliente, clienteId);
+        VoucherTroca voucher = new VoucherTroca();
+        voucher.setCodigo("TR-NAO-CONSUMIR");
+        voucher.setValor(new BigDecimal("25.00"));
+        voucher.setCliente(cliente);
+        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("TR-NAO-CONSUMIR")).thenReturn(Optional.empty());
+        when(voucherTrocaRepository.findByCodigoIgnoreCase("TR-NAO-CONSUMIR")).thenReturn(Optional.of(voucher));
+        when(pedidoRepository.save(pedido)).thenReturn(pedido);
+
+        var response = service.aplicarCupom(1L, clienteId, "TR-NAO-CONSUMIR");
+
+        assertEquals(new BigDecimal("25.00"), voucher.getValor());
+        assertEquals(new BigDecimal("10.00"), response.getDesconto());
+        org.junit.jupiter.api.Assertions.assertNull(voucher.getResgatadoEm());
+        verify(voucherTrocaRepository, never()).save(voucher);
     }
 
     @Test
@@ -195,6 +262,7 @@ class PedidoServiceTest {
         Cliente cliente = pedido.getCliente();
         setId(cliente, clienteId);
         voucher.setCliente(cliente);
+        voucher.setValor(new BigDecimal("10.00"));
         when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
         when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("TR-ABC123")).thenReturn(Optional.empty());
         when(voucherTrocaRepository.findByCodigoForUpdate("TR-ABC123")).thenReturn(Optional.of(voucher));
@@ -211,6 +279,36 @@ class PedidoServiceTest {
         assertEquals(BigDecimal.ZERO.setScale(2), response.getTotal());
         assertEquals(pedido, voucher.getPedidoResgate());
         org.junit.jupiter.api.Assertions.assertNotNull(voucher.getResgatadoEm());
+    }
+
+    @Test
+    void deveAjustarSaldoRestanteDoVoucherQuandoUsoForParcial() throws Exception {
+        Pedido pedido = pedidoBase();
+        pedido.setSubtotal(new BigDecimal("10.00"));
+        pedido.setDesconto(new BigDecimal("10.00"));
+        pedido.setTotal(BigDecimal.ZERO.setScale(2));
+        pedido.setCupom("TR-RESTANTE");
+        VoucherTroca voucher = new VoucherTroca();
+        voucher.setCodigo("TR-RESTANTE");
+        Cliente cliente = pedido.getCliente();
+        setId(cliente, clienteId);
+        voucher.setCliente(cliente);
+        voucher.setValor(new BigDecimal("50.00"));
+        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("TR-RESTANTE")).thenReturn(Optional.empty());
+        when(voucherTrocaRepository.findByCodigoForUpdate("TR-RESTANTE")).thenReturn(Optional.of(voucher));
+        when(carrinhoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido.getCarrinho()));
+        when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque(0, 1, 0)));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        FinalizarCompraRequest request = new FinalizarCompraRequest();
+        request.setCarrinhoId(1L);
+        request.setPagamentos(List.of());
+
+        service.finalizar(1L, clienteId, request);
+
+        assertEquals(new BigDecimal("40.00"), voucher.getValor());
+        assertEquals(pedido, voucher.getPedidoResgate());
+        org.junit.jupiter.api.Assertions.assertNull(voucher.getResgatadoEm());
     }
 
     @Test
@@ -257,12 +355,41 @@ class PedidoServiceTest {
     }
 
     @Test
+    void deveNaoGerarEstoqueBloqueadoNegativoQuandoAReservaJaFoiLiberada() throws Exception {
+        Pedido pedido = pedidoBase();
+        Estoque estoque = estoque(2, 0, 0);
+        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque));
+        when(pedidoRepository.save(pedido)).thenReturn(pedido);
+
+        service.cancelarCliente(1L, clienteId);
+
+        assertEquals(2, estoque.getQuantidadeDisponivel());
+        assertEquals(0, estoque.getQuantidadeBloqueada());
+    }
+
+    @Test
     void deveRejeitarRetrocessoDeStatus() {
         Pedido pedido = new Pedido();
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
         when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
 
         assertThrows(RegraDeNegocioException.class, () -> service.atualizarStatus(1L, StatusPedido.PENDENTE));
+    }
+
+    @Test
+    void deveAtualizarRastreamentoQuandoStatusDoPedidoMudar() throws Exception {
+        Pedido pedido = pedidoSemItens();
+        pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
+        LocalDateTime ultimaModificacao = LocalDateTime.now().minusHours(1);
+        setField(pedido, "atualizadoEm", ultimaModificacao);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(pedido)).thenReturn(pedido);
+
+        var response = service.atualizarStatus(1L, StatusPedido.PAGAMENTO_APROVADO);
+
+        assertEquals(StatusPedido.PAGAMENTO_APROVADO.name(), response.getRastreamento().getEtapa());
+        assertTrue(response.getRastreamento().getUltimaModificacao().isAfter(ultimaModificacao));
     }
 
     @Test
@@ -386,5 +513,11 @@ class PedidoServiceTest {
                 : Cliente.class.getDeclaredField("id");
         field.setAccessible(true);
         field.set(target, id);
+    }
+
+    private void setField(Object target, String name, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 }

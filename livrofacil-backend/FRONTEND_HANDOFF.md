@@ -5,7 +5,7 @@ Este documento resume as alteracoes realizadas no backend e orienta a integracao
 ## Resumo
 
 - O backend agora implementa solicitacao e administracao de trocas, com emissao de voucher apos o recebimento do item.
-- O checkout agora expoe validacao de cupons e permite aplicar um cupom ou voucher a um pedido ja iniciado, recalculando o total no servidor.
+- O checkout agora expoe validacao de cupons e permite aplicar um cupom ou voucher a um pedido ja iniciado, recalculando o total no servidor. Validar/aplicar nao consome o cupom; uso promocional e registrado apenas quando a finalizacao do pedido tem sucesso.
 - PedidoResponse agora inclui os pagamentos registrados, para a tela de pedidos administrativos.
 - O cadastro/edicao de livros, o checkout de pedidos e a listagem administrativa ja existiam no backend. Os testes desses fluxos passaram; nao foi necessario criar outro CRUD de livros.
 - O frontend ainda precisa integrar as novas chamadas e adequar os payloads/estado de pagamento indicados abaixo.
@@ -56,9 +56,9 @@ Se `retornarEstoque` for `true`, a quantidade do item volta ao estoque e a quant
 - O objeto da troca inclui `voucherCodigo` e `voucherValor`; tambem inclui `voucherResgatadoEm`, inicialmente `null`.
 - O codigo segue `TR-` + 16 caracteres hexadecimais em maiusculas. Exemplo de formato: `TR-1A2B3C4D5E6F7890`.
 - O valor e o preco unitario historico da compra multiplicado pela quantidade da linha do pedido.
-- O voucher pertence ao cliente, nao tem expiracao implementada e pode ser resgatado uma vez.
+- O voucher pertence ao cliente e nao tem expiracao implementada. O saldo e reutilizavel em compras parciais; a validacao nao altera nem consome o voucher. Ele so e marcado como usado quando o saldo chega a zero.
 - Aplicar em um pedido de outro cliente ou tentar reutilizar um voucher ja resgatado e rejeitado.
-- O credito descontado e limitado ao subtotal do pedido. O voucher e consumido integralmente na finalizacao; eventual saldo acima do total da compra nao permanece como credito. A interface deve deixar essa regra clara.
+- O credito descontado e limitado ao subtotal do pedido. Na finalizacao, o backend subtrai do voucher apenas o valor efetivamente utilizado; saldo restante continua disponivel e `voucherResgatadoEm` so e preenchido quando chega a zero. `voucherValor` na resposta da troca representa o saldo atual.
 - Nao existe endpoint exclusivo de busca de voucher; o codigo e retornado pela resposta da troca e validado pelo endpoint de cupons.
 
 Formato resumido de resposta da troca:
@@ -105,7 +105,7 @@ Cupom percentual valido:
 }
 ```
 
-Voucher valido usa `"tipo":"FIXO"` e `valor` monetario. Codigo invalido, inativo ou voucher ja consumido retorna `valido: false`; a validacao nao altera o pedido. O endpoint e `POST`, nao ha `GET /api/cupons` nem filtros de listagem de cupons implementados.
+Voucher valido usa `"tipo":"FIXO"` e `valor` monetario. Codigo invalido, inativo, voucher ja consumido ou voucher sem saldo retorna `valido: false`; validacao e somente leitura e nao marca o voucher como utilizado nem incrementa uso de cupom. O endpoint e `POST`, nao ha `GET /api/cupons` nem filtros de listagem de cupons implementados.
 
 ### Aplicacao
 
@@ -127,10 +127,15 @@ O frontend deve atualizar a divisao dos pagamentos com o campo `total` retornado
 
 - `POST /api/pedidos/iniciar` persiste um pedido/reserva em checkout, com status inicial `EM_CHECKOUT`, itens, subtotal, desconto, total e reserva de estoque. A reserva expira conforme `livrofacil.checkout.expiracao-minutos` (padrao de 30 minutos).
 - Status aceitos pelo dominio: `PENDENTE`, `AGUARDANDO_PAGAMENTO`, `EM_CHECKOUT`, `EM_PROCESSAMENTO`, `PAGAMENTO_APROVADO`, `EM_SEPARACAO`, `NA_TRANSPORTADORA`, `EM_ROTA_DE_ENTREGA`, `ENTREGUE`, `FINALIZADO`, `CANCELADO`.
+- `PedidoResponse.rastreamento` retorna `etapa` (status atual) e `ultimaModificacao` (data/hora da ultima alteracao). Use esses campos nos detalhes para apresentar etapa atual e ultima atualizacao. Nao ha historico persistido de todas as transicoes.
 - Finalizar com sucesso grava pagamentos, confirma a venda no estoque, esvazia o carrinho e retorna `EM_PROCESSAMENTO`.
 - `GET /api/pedidos/admin` lista pedidos persistidos. `GET /api/pedidos/admin/{pedidoId}` retorna detalhe. A resposta do pedido inclui `id`, `clienteId`, `cliente`, `status`, datas, subtotal, desconto, total, cupom, enderecos, itens e pagamentos.
 - Cada item inclui `id`, `pedidoId`, `livroId`, `quantidade` e `valorUnitario`.
 - Cada pagamento inclui `id`, `formaPagamentoId`, `valor`, `parcelas`, `bandeira` e `ultimosDigitos`. Nao sao retornados titular nem validade do cartao.
+
+## Escopo de devolucoes e trocas
+
+O fluxo existente permite ao cliente solicitar troca de um item de pedido entregue, ao administrador listar e autorizar/recusar, e registrar o recebimento. No recebimento, pode opcionalmente retornar o item ao estoque e o backend emite voucher pelo valor historico do item. Estados: `SOLICITADA`, `AUTORIZADA`, `RECUSADA`, `TROCADA`. Nao estao implementados reembolso em dinheiro, envio automatico de substituto, etiqueta/logistica reversa ou prazo configuravel. A interface deve oferecer somente as operacoes disponiveis.
 
 ## Livros
 
@@ -183,8 +188,10 @@ Os campos textuais/codigos, inteiros positivos, IDs e dimensoes sao validados; c
 
 Os testes de unidade direcionados e a suite sem o teste `@SpringBootTest` passaram: 160 testes, zero falhas/erros. O teste de contexto completo nao foi executado porque o datasource configurado aponta para banco remoto. A persistencia real das novas entidades e a integracao ponta a ponta precisam ser verificadas em ambiente de desenvolvimento apropriado.
 
+Nesta atualizacao foram executados 28 testes direcionados de `PedidoServiceTest`, `CupomServiceTest` e `TrocaServiceTest`, todos passando. A suite completa e o teste de contexto Spring nao foram executados nesta alteracao.
+
 ## Prompt pronto para a IA do frontend
 
 ```text
-Leia o arquivo FRONTEND_HANDOFF.md trazido do livrofacil-backend e use-o como contrato atual da API. Inspecione o fluxo ativo do livrofacil-frontend, sem alterar fluxos legados que nao estejam ligados as rotas atuais. Integre: (1) solicitacao/listagem de troca do cliente e acoes administrativas de autorizar, recusar e receber; (2) exibicao do voucher retornado ao receber a troca; (3) validacao e aplicacao de cupom/voucher no checkout, incluindo clienteId na query de aplicacao e recalculo dos pagamentos a partir do total retornado; (4) exiba no painel administrativo os pagamentos e os dados do pedido que o backend retorna. O CRUD de livros ja existe na API: conecte formulario/catalogo aos endpoints descritos em vez de duplicar cadastro. Antes de editar, informe quais arquivos e rotas ativas identificou, incompatibilidades do frontend com estes contratos e uma proposta curta de implementacao. Depois implemente apenas o necessario, atualize testes e rode verificacoes. Nao invente GET /cupons, upload de capa, autenticacao por token ou validade de voucher, pois nao estao implementados. Ao final, liste arquivos alterados, testes rodados e qualquer incompatibilidade restante.
+Leia o arquivo FRONTEND_HANDOFF.md do backend como contrato atual. Inspecione o fluxo ativo do frontend, sem alterar fluxos legados. Integre: (1) solicitacao/listagem de troca do cliente e acoes administrativas de autorizar, recusar e receber; (2) exibicao de `voucherCodigo`, saldo atual em `voucherValor` e `voucherResgatadoEm`, considerando o voucher usado somente quando o saldo zera; (3) validacao e aplicacao de cupom/voucher no checkout, sem consumir ao validar/aplicar, enviando `clienteId` na query e recalculando pagamentos pelo `total` retornado; (4) nos detalhes do pedido, exiba rastreamento com `rastreamento.etapa` e `rastreamento.ultimaModificacao` (nao ha historico de eventos); (5) admin: pagamentos e dados de pedido retornados; (6) nao prometa reembolso em dinheiro nem envio automatico de substituto, pois nao existem na API. CRUD de livros ja existe; integre os endpoints descritos. Antes de editar, liste arquivos/rotas, incompatibilidades e plano curto; depois implemente o necessario, teste e reporte arquivos alterados, testes e pendencias. Nao invente GET /cupons, upload de capa, autenticacao por token ou validade de voucher.
 ```

@@ -45,9 +45,10 @@ public class FormaPagamentoUseCase {
         if (numeroCartao.length() != 16) {
             throw new RegraDeNegocioException("O numero do cartao deve possuir exatamente 16 digitos");
         }
+        validarCodigoSeguranca(request.getCodigoSeguranca());
         FormaPagamento formaPagamento = new FormaPagamento(
             request.getNomeTitular(), request.getTipoCartao(), numeroCartao.substring(numeroCartao.length() - 4),
-            request.getValidade(), request.getBandeira(), request.isPreferencial(), cliente
+            request.getCodigoSeguranca(), request.getValidade(), request.getBandeira(), request.isPreferencial(), cliente
         );
         return new FormaPagamentoResponse(formaPagamentoRepository.save(formaPagamento));
     }
@@ -83,8 +84,10 @@ public class FormaPagamentoUseCase {
         if (numeroCartao.length() != 16) {
             throw new RegraDeNegocioException("O numero do cartao deve possuir exatamente 16 digitos");
         }
+        validarCodigoSeguranca(request.getCodigoSeguranca());
         formaPagamento.setNomeTitular(request.getNomeTitular());
         formaPagamento.setTipoCartao(request.getTipoCartao());
+        formaPagamento.setCodigoSeguranca(request.getCodigoSeguranca());
         formaPagamento.setValidade(request.getValidade());
         formaPagamento.setBandeira(request.getBandeira());
         formaPagamento.setUltimosDigitos(numeroCartao.substring(numeroCartao.length() - 4));
@@ -153,6 +156,12 @@ public class FormaPagamentoUseCase {
             formaPagamento.setPreferencial(false);
             formaPagamentoRepository.save(formaPagamento);
         });
+    }
+
+    private void validarCodigoSeguranca(String codigoSeguranca) {
+        if (codigoSeguranca == null || !codigoSeguranca.matches("\\d{3,4}")) {
+            throw new RegraDeNegocioException("O codigo de seguranca do cartao deve conter 3 ou 4 digitos");
+        }
     }
 
     private void validarBandeiraDisponivel(String nome) {

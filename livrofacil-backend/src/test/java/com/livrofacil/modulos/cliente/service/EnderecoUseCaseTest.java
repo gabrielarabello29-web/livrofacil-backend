@@ -48,6 +48,10 @@ class EnderecoUseCaseTest {
         var response = useCase.criar(clienteId, request(true));
 
         assertEquals(true, response.isPrincipal());
+        assertEquals("CASA", response.getTipoResidencia());
+        assertEquals("Nova rua", response.getTipoLogradouro());
+        assertEquals("Brasil", response.getPais());
+        assertEquals("Casa na esquina", response.getObservacoes());
         assertEquals(false, anterior.isPrincipal());
         verify(enderecoRepository).save(anterior);
     }
@@ -97,14 +101,14 @@ class EnderecoUseCaseTest {
     }
 
     private Endereco endereco(boolean principal) {
-        return new Endereco("CASA", "Rua", "10", "", "Centro", "Cidade", "SP", "01000-000", principal, cliente);
+        return new Endereco("CASA", "Rua", "10", "", "Centro", "Cidade", "SP", "01000-000", "Brasil", "Casa na esquina", principal, cliente);
     }
 
     private EnderecoRequest request(boolean principal) {
         EnderecoRequest request = new EnderecoRequest();
         request.setTipoEndereco("CASA"); request.setLogradouro("Nova rua"); request.setNumero("20");
         request.setBairro("Centro"); request.setCidade("Cidade"); request.setEstado("SP");
-        request.setCep("01000-000"); request.setPrincipal(principal);
+        request.setCep("01000-000"); request.setPais("Brasil"); request.setObservacoes("Casa na esquina"); request.setPrincipal(principal);
         return request;
     }
 }

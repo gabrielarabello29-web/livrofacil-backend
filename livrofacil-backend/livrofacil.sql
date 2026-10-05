@@ -160,9 +160,14 @@ ALTER TABLE public.cliente OWNER TO postgres;
 
 CREATE TABLE public.cupom (
     cup_ativo boolean NOT NULL,
-    cup_percentual_desconto numeric(5,2) NOT NULL,
+    cup_codigo character varying(50) NOT NULL,
+    cup_data_fim_vigencia date,
     cup_id bigint NOT NULL,
-    cup_codigo character varying(50) NOT NULL
+    cup_numero_uso_atual integer NOT NULL DEFAULT 0,
+    cup_numero_uso_maximo integer,
+    cup_percentual_desconto numeric(5,2),
+    cup_tipo_desconto character varying(20) NOT NULL DEFAULT 'PERCENTUAL',
+    cup_valor_desconto numeric(10,2)
 );
 
 
@@ -607,7 +612,7 @@ S	f	1990-01-01	2026-09-19 19:00:11.488886	\N	2	98765432100	a9538522-3653-4e86-ba
 -- Data for Name: cupom; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.cupom (cup_ativo, cup_percentual_desconto, cup_id, cup_codigo) FROM stdin;
+COPY public.cupom (cup_ativo, cup_codigo, cup_data_fim_vigencia, cup_id, cup_numero_uso_atual, cup_numero_uso_maximo, cup_percentual_desconto, cup_tipo_desconto, cup_valor_desconto) FROM stdin;
 \.
 
 
