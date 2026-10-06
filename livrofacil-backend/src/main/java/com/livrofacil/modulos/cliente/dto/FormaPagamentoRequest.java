@@ -18,6 +18,10 @@ public class FormaPagamentoRequest {
     @Pattern(regexp = "^\\d{4} \\d{4} \\d{4} \\d{4}$", message = "O numero do cartao deve seguir o formato 1111 1111 1111 1111")
     private String numeroCartao;
 
+    @NotBlank(message = "O codigo de seguranca e obrigatorio")
+    @Pattern(regexp = "^\\d{3,4}$", message = "O codigo de seguranca deve conter 3 ou 4 digitos")
+    private String codigoSeguranca;
+
     @NotBlank(message = "A validade do cartao e obrigatoria")
     @Pattern(regexp = "^(0[1-9]|1[0-2])/\\d{2}$", message = "A validade deve seguir o formato MM/AA")
     private String validade;
@@ -34,6 +38,8 @@ public class FormaPagamentoRequest {
     public void setTipoCartao(String tipoCartao) { this.tipoCartao = tipoCartao; }
     public String getNumeroCartao() { return numeroCartao; }
     public void setNumeroCartao(String numeroCartao) { this.numeroCartao = formatarNumeroCartao(numeroCartao); }
+    public String getCodigoSeguranca() { return codigoSeguranca; }
+    public void setCodigoSeguranca(String codigoSeguranca) { this.codigoSeguranca = codigoSeguranca; }
 
     private String formatarNumeroCartao(String numeroCartao) {
         if (numeroCartao == null) {

@@ -1,6 +1,7 @@
 package com.livrofacil.modulos.compra.controller;
 
 import com.livrofacil.modulos.compra.entity.StatusPedido;
+import com.livrofacil.modulos.compra.dto.AplicarCupomRequest;
 import com.livrofacil.modulos.compra.service.PedidoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ class PedidoControllerTest {
 
     @Test void deveIniciar() { when(service.iniciar(null)).thenReturn(null); assertEquals(HttpStatus.CREATED, controller.iniciar(null).getStatusCode()); }
     @Test void deveFinalizar() { when(service.finalizar(1L, clienteId, null)).thenReturn(null); assertEquals(HttpStatus.OK, controller.finalizar(1L, clienteId, null).getStatusCode()); }
+    @Test void deveAplicarCupom() { when(service.aplicarCupom(1L, clienteId, "DESC10")).thenReturn(null); var request = new AplicarCupomRequest(); request.setCodigo("DESC10"); assertEquals(HttpStatus.OK, controller.aplicarCupom(1L, clienteId, request).getStatusCode()); }
     @Test void deveListarCliente() { when(service.listarCliente(clienteId)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarCliente(clienteId).getStatusCode()); }
     @Test void deveBuscarCliente() { when(service.buscarDetalhe(1L, clienteId)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarCliente(1L, clienteId).getStatusCode()); }
     @Test void deveCancelar() { when(service.cancelarCliente(1L, clienteId)).thenReturn(null); assertEquals(HttpStatus.OK, controller.cancelar(1L, clienteId).getStatusCode()); }

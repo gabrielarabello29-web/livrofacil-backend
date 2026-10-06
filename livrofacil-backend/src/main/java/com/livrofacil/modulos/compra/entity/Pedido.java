@@ -47,6 +47,9 @@ public class Pedido {
     @Column(name = "ped_desconto", nullable = false, precision = 12, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;
 
+    @Column(name = "ped_frete", nullable = false, precision = 12, scale = 2)
+    private BigDecimal frete = BigDecimal.ZERO;
+
     @Column(name = "ped_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
@@ -73,7 +76,12 @@ public class Pedido {
     public Long getCheckoutChave() { return checkoutChave; }
     public void setCheckoutChave(Long checkoutChave) { this.checkoutChave = checkoutChave; }
     public StatusPedido getStatus() { return status; }
-    public void setStatus(StatusPedido status) { this.status = status; }
+    public void setStatus(StatusPedido status) {
+        if (this.status != status) {
+            this.status = status;
+            this.atualizadoEm = LocalDateTime.now();
+        }
+    }
     public LocalDateTime getCriadoEm() { return criadoEm; }
     public LocalDateTime getAtualizadoEm() { return atualizadoEm; }
     public void atualizarAtividade() { this.atualizadoEm = LocalDateTime.now(); }
@@ -83,6 +91,8 @@ public class Pedido {
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
     public BigDecimal getDesconto() { return desconto; }
     public void setDesconto(BigDecimal desconto) { this.desconto = desconto; }
+    public BigDecimal getFrete() { return frete == null ? BigDecimal.ZERO : frete; }
+    public void setFrete(BigDecimal frete) { this.frete = frete == null ? BigDecimal.ZERO : frete; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
     public String getCupom() { return cupom; }

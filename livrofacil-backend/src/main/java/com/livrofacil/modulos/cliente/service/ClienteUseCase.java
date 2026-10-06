@@ -77,6 +77,8 @@ public class ClienteUseCase {
                 request.getEndereco().getCidade(),
                 request.getEndereco().getEstado(),
                 request.getEndereco().getCep(),
+                request.getEndereco().getPais(),
+                request.getEndereco().getObservacoes(),
                 true,
                 cliente
         );

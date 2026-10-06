@@ -31,6 +31,19 @@ public class CheckoutSchemaMigration {
       jdbcTemplate.execute("update forma_pagamento set for_pag_criado_em = current_timestamp where for_pag_criado_em is null");
       jdbcTemplate.execute("alter table forma_pagamento alter column for_pag_criado_em set default current_timestamp");
       jdbcTemplate.execute("alter table forma_pagamento alter column for_pag_criado_em set not null");
+      jdbcTemplate.execute("update pedido set ped_atualizado_em = coalesce(ped_criado_em, current_timestamp) where ped_atualizado_em is null");
+      jdbcTemplate.execute("alter table cupom add column if not exists cup_tipo_desconto varchar(20)");
+      jdbcTemplate.execute("update cupom set cup_tipo_desconto = 'PERCENTUAL' where cup_tipo_desconto is null");
+      jdbcTemplate.execute("alter table cupom alter column cup_tipo_desconto set default 'PERCENTUAL'");
+      jdbcTemplate.execute("alter table cupom alter column cup_tipo_desconto set not null");
+      jdbcTemplate.execute("alter table cupom add column if not exists cup_valor_desconto numeric(10,2)");
+      jdbcTemplate.execute("alter table cupom add column if not exists cup_data_fim_vigencia date");
+      jdbcTemplate.execute("alter table cupom add column if not exists cup_numero_uso_maximo integer");
+      jdbcTemplate.execute("alter table cupom add column if not exists cup_numero_uso_atual integer");
+      jdbcTemplate.execute("update cupom set cup_numero_uso_atual = 0 where cup_numero_uso_atual is null");
+      jdbcTemplate.execute("alter table cupom alter column cup_numero_uso_atual set default 0");
+      jdbcTemplate.execute("alter table cupom alter column cup_numero_uso_atual set not null");
+      jdbcTemplate.execute("alter table cupom alter column cup_percentual_desconto drop not null");
 
         List<String> constraints = jdbcTemplate.queryForList("""
                 select distinct c.conname
@@ -93,10 +106,15 @@ public class CheckoutSchemaMigration {
               "CHECK (ite_ped_quantidade > 0)");
             adicionarConstraint("item_pedido", "ck_item_pedido_valor_nao_negativo",
               "CHECK (ite_ped_valor_unitario >= 0)");
+            jdbcTemplate.execute("alter table pedido add column if not exists ped_frete numeric(12,2) not null default 0");
+            jdbcTemplate.execute("alter table voucher_troca alter column tro_id drop not null");
+            jdbcTemplate.execute("update pedido set ped_frete = 0 where ped_frete is null");
             adicionarConstraint("pedido", "ck_pedido_subtotal_nao_negativo",
               "CHECK (ped_subtotal >= 0)");
             adicionarConstraint("pedido", "ck_pedido_desconto_nao_negativo",
               "CHECK (ped_desconto >= 0)");
+            adicionarConstraint("pedido", "ck_pedido_frete_nao_negativo",
+              "CHECK (ped_frete >= 0)");
             adicionarConstraint("pedido", "ck_pedido_total_nao_negativo",
               "CHECK (ped_total >= 0)");
             adicionarConstraint("pagamento_pedido", "ck_pagamento_valor_positivo",
