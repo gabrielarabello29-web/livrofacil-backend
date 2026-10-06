@@ -5,7 +5,8 @@ Este documento resume as alteracoes realizadas no backend e orienta a integracao
 ## Resumo
 
 - O backend agora implementa solicitacao e administracao de trocas, com emissao de voucher apos o recebimento do item.
-- O checkout agora expoe validacao de cupons e permite aplicar um cupom ou voucher a um pedido ja iniciado, recalculando o total no servidor. Validar/aplicar nao consome o cupom; uso promocional e registrado apenas quando a finalizacao do pedido tem sucesso.
+- O checkout agora expoe validacao de cupons e permite aplicar um cupom ou voucher a um pedido ja iniciado, recalculando o total no servidor. Validar/aplicar nao consome o cupom; o consumo e registrado apenas quando a finalizacao do pedido tem sucesso.
+- Se o valor do voucher superar o total devido, incluindo frete, a finalizacao consome o voucher original e emite um novo voucher com o saldo, na mesma transacao.
 - PedidoResponse agora inclui os pagamentos registrados, para a tela de pedidos administrativos.
 - O cadastro/edicao de livros, o checkout de pedidos e a listagem administrativa ja existiam no backend. Os testes desses fluxos passaram; nao foi necessario criar outro CRUD de livros.
 - O frontend ainda precisa integrar as novas chamadas e adequar os payloads/estado de pagamento indicados abaixo.
@@ -56,10 +57,12 @@ Se `retornarEstoque` for `true`, a quantidade do item volta ao estoque e a quant
 - O objeto da troca inclui `voucherCodigo` e `voucherValor`; tambem inclui `voucherResgatadoEm`, inicialmente `null`.
 - O codigo segue `TR-` + 16 caracteres hexadecimais em maiusculas. Exemplo de formato: `TR-1A2B3C4D5E6F7890`.
 - O valor e o preco unitario historico da compra multiplicado pela quantidade da linha do pedido.
-- O voucher pertence ao cliente e nao tem expiracao implementada. O saldo e reutilizavel em compras parciais; a validacao nao altera nem consome o voucher. Ele so e marcado como usado quando o saldo chega a zero.
+- O voucher pertence ao cliente e nao tem expiracao implementada. A validacao nao altera nem consome o voucher. Na finalizacao, o voucher original e consumido; eventual saldo positivo e emitido em um novo voucher, vinculado ao mesmo cliente.
 - Aplicar em um pedido de outro cliente ou tentar reutilizar um voucher ja resgatado e rejeitado.
-- O credito descontado e limitado ao subtotal do pedido. Na finalizacao, o backend subtrai do voucher apenas o valor efetivamente utilizado; saldo restante continua disponivel e `voucherResgatadoEm` so e preenchido quando chega a zero. `voucherValor` na resposta da troca representa o saldo atual.
-- Nao existe endpoint exclusivo de busca de voucher; o codigo e retornado pela resposta da troca e validado pelo endpoint de cupons.
+- Ao aplicar um voucher, o desconto e limitado ao valor devido antes do voucher: subtotal mais frete. Se o voucher for maior, o pedido fica com total zero e nao exige pagamentos.
+- Na finalizacao, o registro original fica com `valor: 0`, `resgatadoEm` preenchido e `pedidoResgateId` associado ao pedido. O saldo positivo e um registro separado, com novo codigo, mesmo cliente e `valor` igual a diferenca. A operacao e transacional; uma finalizacao repetida nao emite outro voucher.
+- `PedidoResponse` de finalizacao inclui `voucherSaldoGerado` quando houver saldo (caso contrario, `null`). A resposta desse objeto tem `id`, `codigo`, `valor`, `criadoEm`, `resgatadoEm` e `pedidoResgateId`.
+- `GET /api/trocas/cliente/{clienteId}/vouchers` lista vouchers do cliente, consumidos ou disponiveis, com os campos `id`, `codigo`, `valor`, `criadoEm`, `resgatadoEm` e `pedidoResgateId`.
 
 Formato resumido de resposta da troca:
 
@@ -117,7 +120,7 @@ Voucher valido usa `"tipo":"FIXO"` e `valor` monetario. Codigo invalido, inativo
 
 O `clienteId` e obrigatorio na query e deve identificar o dono do pedido. O endpoint retorna o PedidoResponse atualizado, incluindo `subtotal`, `desconto`, `total` e `cupom`. A aplicacao exige que o pedido continue em checkout e que a reserva nao tenha expirado.
 
-A validacao do codigo nao calcula o total. O total muda na aplicacao ao pedido, nao na validacao. Para cupom percentual, o desconto e calculado sobre o subtotal; para voucher fixo, usa-se o menor entre valor do voucher e subtotal.
+A validacao do codigo nao calcula o total. O total muda na aplicacao ao pedido, nao na validacao. Para cupom percentual, o desconto e calculado sobre o subtotal; para voucher fixo, usa-se o menor entre valor do voucher e total devido antes do voucher (subtotal mais frete).
 
 ### Pagamento apos desconto
 
@@ -193,5 +196,5 @@ Nesta atualizacao foram executados 28 testes direcionados de `PedidoServiceTest`
 ## Prompt pronto para a IA do frontend
 
 ```text
-Leia o arquivo FRONTEND_HANDOFF.md do backend como contrato atual. Inspecione o fluxo ativo do frontend, sem alterar fluxos legados. Integre: (1) solicitacao/listagem de troca do cliente e acoes administrativas de autorizar, recusar e receber; (2) exibicao de `voucherCodigo`, saldo atual em `voucherValor` e `voucherResgatadoEm`, considerando o voucher usado somente quando o saldo zera; (3) validacao e aplicacao de cupom/voucher no checkout, sem consumir ao validar/aplicar, enviando `clienteId` na query e recalculando pagamentos pelo `total` retornado; (4) nos detalhes do pedido, exiba rastreamento com `rastreamento.etapa` e `rastreamento.ultimaModificacao` (nao ha historico de eventos); (5) admin: pagamentos e dados de pedido retornados; (6) nao prometa reembolso em dinheiro nem envio automatico de substituto, pois nao existem na API. CRUD de livros ja existe; integre os endpoints descritos. Antes de editar, liste arquivos/rotas, incompatibilidades e plano curto; depois implemente o necessario, teste e reporte arquivos alterados, testes e pendencias. Nao invente GET /cupons, upload de capa, autenticacao por token ou validade de voucher.
+Leia o arquivo FRONTEND_HANDOFF.md do backend como contrato atual. Inspecione o fluxo ativo do frontend, sem alterar fluxos legados. Integre: (1) solicitacao/listagem de troca do cliente e acoes administrativas de autorizar, recusar e receber; (2) exibicao de vouchers retornados em `GET /api/trocas/cliente/{clienteId}/vouchers`, incluindo codigo, valor e estado de resgate; (3) validacao e aplicacao de cupom/voucher no checkout, sem consumir ao validar/aplicar, enviando `clienteId` na query e recalculando pagamentos pelo `total` retornado; na finalizacao, trate `voucherSaldoGerado` se presente; (4) nos detalhes do pedido, exiba rastreamento com `rastreamento.etapa` e `rastreamento.ultimaModificacao` (nao ha historico de eventos); (5) admin: pagamentos e dados de pedido retornados; (6) nao prometa reembolso em dinheiro nem envio automatico de substituto, pois nao existem na API. CRUD de livros ja existe; integre os endpoints descritos. Antes de editar, liste arquivos/rotas, incompatibilidades e plano curto; depois implemente o necessario, teste e reporte arquivos alterados, testes e pendencias. Nao invente GET /cupons, upload de capa, autenticacao por token ou validade de voucher.
 ```

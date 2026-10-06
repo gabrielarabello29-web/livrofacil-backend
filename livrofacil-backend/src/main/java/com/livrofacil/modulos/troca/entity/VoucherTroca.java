@@ -25,8 +25,8 @@ public class VoucherTroca {
     @JoinColumn(name = "cli_id", nullable = false)
     private Cliente cliente;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tro_id", nullable = false, unique = true)
+    @OneToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tro_id", nullable = true, unique = true)
     private Troca troca;
 
     @ManyToOne(fetch = FetchType.LAZY)

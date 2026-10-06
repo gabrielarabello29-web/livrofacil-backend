@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -282,7 +283,7 @@ class PedidoServiceTest {
     }
 
     @Test
-    void deveAjustarSaldoRestanteDoVoucherQuandoUsoForParcial() throws Exception {
+    void deveEmitirNovoVoucherQuandoUsoForParcial() throws Exception {
         Pedido pedido = pedidoBase();
         pedido.setSubtotal(new BigDecimal("10.00"));
         pedido.setDesconto(new BigDecimal("10.00"));
@@ -304,11 +305,58 @@ class PedidoServiceTest {
         request.setCarrinhoId(1L);
         request.setPagamentos(List.of());
 
-        service.finalizar(1L, clienteId, request);
+        var response = service.finalizar(1L, clienteId, request);
 
-        assertEquals(new BigDecimal("40.00"), voucher.getValor());
+        assertEquals(BigDecimal.ZERO, voucher.getValor());
         assertEquals(pedido, voucher.getPedidoResgate());
-        org.junit.jupiter.api.Assertions.assertNull(voucher.getResgatadoEm());
+        org.junit.jupiter.api.Assertions.assertNotNull(voucher.getResgatadoEm());
+        assertEquals(new BigDecimal("40.00"), response.getVoucherSaldoGerado().getValor());
+        org.junit.jupiter.api.Assertions.assertNotEquals(voucher.getCodigo(), response.getVoucherSaldoGerado().getCodigo());
+        verify(voucherTrocaRepository, times(2)).save(any(VoucherTroca.class));
+    }
+
+    @Test
+    void deveAplicarVoucherAoFreteEmitirSaldoNovoEImpedirDuplicidade() throws Exception {
+        Pedido pedido = pedidoBase();
+        pedido.setSubtotal(new BigDecimal("100.00"));
+        pedido.setFrete(new BigDecimal("19.90"));
+        pedido.setTotal(new BigDecimal("119.90"));
+        Cliente cliente = pedido.getCliente();
+        setId(cliente, clienteId);
+        VoucherTroca voucher = new VoucherTroca();
+        voucher.setCodigo("TR-ORIGINAL");
+        voucher.setCliente(cliente);
+        voucher.setValor(new BigDecimal("150.00"));
+
+        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue("TR-ORIGINAL")).thenReturn(Optional.empty());
+        when(voucherTrocaRepository.findByCodigoIgnoreCase("TR-ORIGINAL")).thenReturn(Optional.of(voucher));
+        when(voucherTrocaRepository.findByCodigoForUpdate("TR-ORIGINAL")).thenReturn(Optional.of(voucher));
+        when(carrinhoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido.getCarrinho()));
+        when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque(0, 1, 0)));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var aplicacao = service.aplicarCupom(1L, clienteId, "TR-ORIGINAL");
+
+        assertEquals(new BigDecimal("119.90"), aplicacao.getDesconto());
+        assertEquals(new BigDecimal("0.00"), aplicacao.getTotal());
+
+        FinalizarCompraRequest request = new FinalizarCompraRequest();
+        request.setCarrinhoId(1L);
+        request.setPagamentos(List.of());
+        var finalizacao = service.finalizar(1L, clienteId, request);
+
+        assertEquals("EM_PROCESSAMENTO", finalizacao.getStatus());
+        assertEquals(new BigDecimal("30.10"), finalizacao.getVoucherSaldoGerado().getValor());
+        assertTrue(finalizacao.getVoucherSaldoGerado().getCodigo().startsWith("TR-"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(voucher.getCodigo(), finalizacao.getVoucherSaldoGerado().getCodigo());
+        assertEquals(clienteId, voucher.getCliente().getId());
+        assertEquals(BigDecimal.ZERO, voucher.getValor());
+        assertEquals(pedido, voucher.getPedidoResgate());
+        org.junit.jupiter.api.Assertions.assertNotNull(voucher.getResgatadoEm());
+        verify(voucherTrocaRepository, times(2)).save(any(VoucherTroca.class));
+
+        assertThrows(RegraDeNegocioException.class, () -> service.finalizar(1L, clienteId, request));
+        verify(voucherTrocaRepository, times(2)).save(any(VoucherTroca.class));
     }
 
     @Test

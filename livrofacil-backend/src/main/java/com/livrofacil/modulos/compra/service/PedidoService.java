@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -181,18 +182,22 @@ public class PedidoService {
         registrarUsoCupom(pedido.getCupom());
         pedido.setTotal(totalComJuros.setScale(2, RoundingMode.HALF_UP));
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
+        VoucherTroca voucherSaldoGerado = null;
         if (voucherResgate != null) {
             BigDecimal valorUsado = pedido.getDesconto().min(voucherResgate.getValor() == null ? BigDecimal.ZERO : voucherResgate.getValor());
             if (valorUsado.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal saldoRestante = voucherResgate.getValor().subtract(valorUsado).max(BigDecimal.ZERO);
-                voucherResgate.setValor(saldoRestante);
+                voucherResgate.setValor(BigDecimal.ZERO);
                 voucherResgate.setPedidoResgate(pedido);
-                if (saldoRestante.compareTo(BigDecimal.ZERO) == 0) {
-                    voucherResgate.setResgatadoEm(LocalDateTime.now());
-                } else {
-                    voucherResgate.setResgatadoEm(null);
-                }
+                voucherResgate.setResgatadoEm(LocalDateTime.now());
                 voucherTrocaRepository.save(voucherResgate);
+                if (saldoRestante.compareTo(BigDecimal.ZERO) > 0) {
+                    voucherSaldoGerado = new VoucherTroca();
+                    voucherSaldoGerado.setCodigo(gerarCodigoVoucher());
+                    voucherSaldoGerado.setValor(saldoRestante);
+                    voucherSaldoGerado.setCliente(voucherResgate.getCliente());
+                    voucherTrocaRepository.save(voucherSaldoGerado);
+                }
             }
         }
         pedido.setCheckoutChave(null);
@@ -207,7 +212,7 @@ public class PedidoService {
         }));
         carrinho.getItens().clear();
         carrinhoRepository.save(carrinho);
-        return new PedidoResponse(pedidoRepository.save(pedido));
+        return new PedidoResponse(pedidoRepository.save(pedido), voucherSaldoGerado);
     }
 
     @Transactional
@@ -238,7 +243,7 @@ public class PedidoService {
                 .orElseThrow(() -> new RegraDeNegocioException("Cupom ou voucher invalido"));
             validarVoucher(voucher, pedido, clienteId);
             codigoAplicado = voucher.getCodigo();
-            desconto = voucher.getValor().min(pedido.getSubtotal());
+            desconto = voucher.getValor().min(pedido.getSubtotal().add(pedido.getFrete()));
         }
         pedido.setCupom(codigoAplicado);
         pedido.setDesconto(desconto);
@@ -405,6 +410,7 @@ public class PedidoService {
                 || !voucher.getCliente().getId().equals(pedido.getCliente().getId())) {
             throw new RegraDeNegocioException("Este voucher pertence a outro cliente");
         }
+
         if (voucher.getValor() == null || voucher.getValor().compareTo(BigDecimal.ZERO) <= 0) {
             throw new RegraDeNegocioException("Voucher aplicado nao esta mais disponivel");
         }
@@ -412,6 +418,16 @@ public class PedidoService {
             throw new RegraDeNegocioException("Este voucher ja foi utilizado");
         }
     }
+
+    private String gerarCodigoVoucher() {
+        String codigo;
+        do {
+            codigo = "TR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
+        } while (voucherTrocaRepository.existsByCodigoIgnoreCase(codigo)
+                || cupomRepository.findByCodigoIgnoreCase(codigo).isPresent());
+        return codigo;
+    }
+
     private String formatarEndereco(Endereco endereco) {
         return endereco.getLogradouro() + ", " + endereco.getNumero() + " - " + endereco.getBairro() + ", " + endereco.getCidade() + "/" + endereco.getEstado() + " - CEP " + endereco.getCep();
     }

@@ -2,6 +2,8 @@ package com.livrofacil.modulos.compra.dto;
 
 import com.livrofacil.modulos.cliente.dto.ClienteResponse;
 import com.livrofacil.modulos.compra.entity.Pedido;
+import com.livrofacil.modulos.troca.dto.VoucherTrocaResponse;
+import com.livrofacil.modulos.troca.entity.VoucherTroca;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,8 +28,13 @@ public class PedidoResponse {
     private String enderecoCobranca;
     private List<ItemPedidoResponse> itens;
     private List<PagamentoPedidoResponse> pagamentos;
+    private VoucherTrocaResponse voucherSaldoGerado;
 
     public PedidoResponse(Pedido pedido) {
+        this(pedido, null);
+    }
+
+    public PedidoResponse(Pedido pedido, VoucherTroca voucherSaldoGerado) {
         this.id = pedido.getId();
         this.clienteId = pedido.getCliente().getId();
         this.carrinhoId = pedido.getCarrinho() == null ? null : pedido.getCarrinho().getId();
@@ -45,6 +52,7 @@ public class PedidoResponse {
         this.enderecoCobranca = pedido.getEnderecoCobranca();
         this.itens = pedido.getItens().stream().map(ItemPedidoResponse::new).toList();
         this.pagamentos = pedido.getPagamentos().stream().map(PagamentoPedidoResponse::new).toList();
+        this.voucherSaldoGerado = voucherSaldoGerado == null ? null : new VoucherTrocaResponse(voucherSaldoGerado);
     }
     public Long getId() { return id; }
     public UUID getClienteId() { return clienteId; }
@@ -63,4 +71,5 @@ public class PedidoResponse {
     public String getEnderecoCobranca() { return enderecoCobranca; }
     public List<ItemPedidoResponse> getItens() { return itens; }
     public List<PagamentoPedidoResponse> getPagamentos() { return pagamentos; }
+    public VoucherTrocaResponse getVoucherSaldoGerado() { return voucherSaldoGerado; }
 }

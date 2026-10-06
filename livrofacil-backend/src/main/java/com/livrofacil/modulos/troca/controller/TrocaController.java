@@ -4,6 +4,7 @@ import com.livrofacil.modulos.troca.dto.ReceberTrocaRequest;
 import com.livrofacil.modulos.troca.dto.RecusarTrocaRequest;
 import com.livrofacil.modulos.troca.dto.SolicitarTrocaRequest;
 import com.livrofacil.modulos.troca.dto.TrocaResponse;
+import com.livrofacil.modulos.troca.dto.VoucherTrocaResponse;
 import com.livrofacil.modulos.troca.service.TrocaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,11 @@ public class TrocaController {
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<TrocaResponse>> listarCliente(@PathVariable UUID clienteId) {
         return ResponseEntity.ok(service.listarCliente(clienteId));
+    }
+
+    @GetMapping("/cliente/{clienteId}/vouchers")
+    public ResponseEntity<List<VoucherTrocaResponse>> listarVouchersCliente(@PathVariable UUID clienteId) {
+        return ResponseEntity.ok(service.listarVouchersCliente(clienteId));
     }
 
     @PatchMapping("/{trocaId}/autorizar")

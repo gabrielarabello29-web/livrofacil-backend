@@ -11,6 +11,7 @@ import com.livrofacil.modulos.compra.repository.ItemPedidoRepository;
 import com.livrofacil.modulos.compra.repository.PedidoRepository;
 import com.livrofacil.modulos.troca.entity.StatusTroca;
 import com.livrofacil.modulos.troca.entity.Troca;
+import com.livrofacil.modulos.troca.entity.VoucherTroca;
 import com.livrofacil.modulos.troca.repository.TrocaRepository;
 import com.livrofacil.modulos.troca.repository.VoucherTrocaRepository;
 import org.junit.jupiter.api.Test;
@@ -21,9 +22,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.lang.reflect.Field;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,6 +92,28 @@ class TrocaServiceTest {
 
         assertThrows(com.livrofacil.exception.RegraDeNegocioException.class, () -> service.solicitar(request));
         verify(trocaRepository, never()).save(any(Troca.class));
+    }
+
+    @Test
+    void deveListarVouchersDoClienteComCamposDeResgate() throws Exception {
+        var service = new TrocaService(trocaRepository, pedidoRepository, itemPedidoRepository,
+                estoqueRepository, voucherTrocaRepository);
+        UUID clienteId = UUID.randomUUID();
+        Cliente cliente = new Cliente("Cliente", "cliente@email.com", "11999999999");
+        setId(cliente, "id", clienteId);
+        VoucherTroca voucher = new VoucherTroca();
+        voucher.setCodigo("TR-SALDO");
+        voucher.setValor(new BigDecimal("30.10"));
+        voucher.setCliente(cliente);
+        when(voucherTrocaRepository.findByClienteIdOrderByCriadoEmDesc(clienteId)).thenReturn(List.of(voucher));
+
+        var vouchers = service.listarVouchersCliente(clienteId);
+
+        assertEquals(1, vouchers.size());
+        assertEquals("TR-SALDO", vouchers.get(0).getCodigo());
+        assertEquals(new BigDecimal("30.10"), vouchers.get(0).getValor());
+        assertNull(vouchers.get(0).getResgatadoEm());
+        assertNull(vouchers.get(0).getPedidoResgateId());
     }
 
     private void setId(Object target, String fieldName, Object id) throws Exception {

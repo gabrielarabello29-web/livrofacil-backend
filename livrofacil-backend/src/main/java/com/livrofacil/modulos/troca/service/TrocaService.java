@@ -8,6 +8,7 @@ import com.livrofacil.modulos.compra.repository.PedidoRepository;
 import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import com.livrofacil.modulos.troca.dto.SolicitarTrocaRequest;
 import com.livrofacil.modulos.troca.dto.TrocaResponse;
+import com.livrofacil.modulos.troca.dto.VoucherTrocaResponse;
 import com.livrofacil.modulos.troca.entity.StatusTroca;
 import com.livrofacil.modulos.troca.entity.Troca;
 import com.livrofacil.modulos.troca.entity.VoucherTroca;
@@ -74,6 +75,13 @@ public class TrocaService {
     @Transactional(readOnly = true)
     public List<TrocaResponse> listarCliente(UUID clienteId) {
         return trocaRepository.findByPedidoClienteIdOrderByCriadoEmDesc(clienteId).stream().map(TrocaResponse::new).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VoucherTrocaResponse> listarVouchersCliente(UUID clienteId) {
+        return voucherRepository.findByClienteIdOrderByCriadoEmDesc(clienteId).stream()
+                .map(VoucherTrocaResponse::new)
+                .toList();
     }
 
     @Transactional

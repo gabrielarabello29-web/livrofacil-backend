@@ -107,6 +107,7 @@ public class CheckoutSchemaMigration {
             adicionarConstraint("item_pedido", "ck_item_pedido_valor_nao_negativo",
               "CHECK (ite_ped_valor_unitario >= 0)");
             jdbcTemplate.execute("alter table pedido add column if not exists ped_frete numeric(12,2) not null default 0");
+            jdbcTemplate.execute("alter table voucher_troca alter column tro_id drop not null");
             jdbcTemplate.execute("update pedido set ped_frete = 0 where ped_frete is null");
             adicionarConstraint("pedido", "ck_pedido_subtotal_nao_negativo",
               "CHECK (ped_subtotal >= 0)");
