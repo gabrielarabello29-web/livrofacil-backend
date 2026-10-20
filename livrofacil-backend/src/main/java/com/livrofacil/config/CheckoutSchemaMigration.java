@@ -20,6 +20,7 @@ public class CheckoutSchemaMigration {
 
     @EventListener(ApplicationStartedEvent.class)
     public void ajustarConstraintsDoCheckout() {
+      garantirSchemaTroca();
       jdbcTemplate.execute("alter table cliente add column if not exists cli_data_exclusao timestamp");
       jdbcTemplate.execute("alter table cliente add column if not exists cli_dados_anonimizados boolean not null default false");
       jdbcTemplate.execute("update cliente set cli_dados_anonimizados = false where cli_dados_anonimizados is null");
@@ -127,6 +128,53 @@ public class CheckoutSchemaMigration {
               "CHECK (est_quantidade_bloqueada >= 0)");
             adicionarConstraint("estoque", "ck_estoque_vendido_nao_negativo",
               "CHECK (est_quantidade_vendida >= 0)");
+    }
+
+    private void garantirSchemaTroca() {
+      jdbcTemplate.execute("""
+          DO $$
+          DECLARE constraint_record record;
+          BEGIN
+            IF to_regclass('public.troca') IS NOT NULL THEN
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_tipo varchar(20);
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_quantidade integer;
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_decidido_em timestamp;
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_recebido_em timestamp;
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_recebido_quantidade integer;
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_retornar_estoque boolean;
+              ALTER TABLE public.troca ADD COLUMN IF NOT EXISTS tro_credito_em timestamp;
+
+              UPDATE public.troca SET tro_tipo = 'TROCA' WHERE tro_tipo IS NULL;
+              UPDATE public.troca SET tro_retornar_estoque = false WHERE tro_retornar_estoque IS NULL;
+
+              ALTER TABLE public.troca ALTER COLUMN tro_tipo SET DEFAULT 'TROCA';
+              ALTER TABLE public.troca ALTER COLUMN tro_tipo SET NOT NULL;
+              ALTER TABLE public.troca ALTER COLUMN tro_retornar_estoque SET DEFAULT false;
+              ALTER TABLE public.troca ALTER COLUMN tro_retornar_estoque SET NOT NULL;
+              ALTER TABLE public.troca ALTER COLUMN tro_status TYPE varchar(30);
+
+              -- Remove legacy status CHECK constraints that reject statuses
+              -- introduced by the exchange workflow.
+              FOR constraint_record IN
+                SELECT conname
+                FROM pg_constraint
+                WHERE conrelid = 'public.troca'::regclass
+                  AND contype = 'c'
+                  AND pg_get_constraintdef(oid) ILIKE '%tro_status%'
+              LOOP
+                EXECUTE format('ALTER TABLE public.troca DROP CONSTRAINT %I', constraint_record.conname);
+              END LOOP;
+
+              ALTER TABLE public.troca DROP CONSTRAINT IF EXISTS ck_troca_status_validos;
+              ALTER TABLE public.troca ADD CONSTRAINT ck_troca_status_validos
+                CHECK (tro_status IN (
+                  'SOLICITADA', 'AGUARDANDO_RECEBIMENTO', 'RECEBIDA', 'CONCLUIDA',
+                  'AUTORIZADA', 'RECUSADA', 'TROCADA'
+                ));
+            END IF;
+          END $$
+          """);
+      LOGGER.info("Schema de troca verificado e corrigido quando necessário");
     }
 
               private void adicionarConstraint(String tabela, String nome, String definicao) {

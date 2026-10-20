@@ -18,6 +18,7 @@ public class PedidoResponse {
     private String status;
     private PedidoRastreamentoResponse rastreamento;
     private LocalDateTime criadoEm;
+    private LocalDateTime entregueEm;
     private LocalDateTime reservaExpiraEm;
     private BigDecimal subtotal;
     private BigDecimal desconto;
@@ -42,6 +43,7 @@ public class PedidoResponse {
         this.status = pedido.getStatus().name();
         this.rastreamento = new PedidoRastreamentoResponse(pedido.getStatus().name(), pedido.getAtualizadoEm());
         this.criadoEm = pedido.getCriadoEm();
+        this.entregueEm = pedido.getEntregueEm();
         this.reservaExpiraEm = pedido.getReservaExpiraEm();
         this.subtotal = pedido.getSubtotal();
         this.desconto = pedido.getDesconto();
@@ -61,6 +63,7 @@ public class PedidoResponse {
     public String getStatus() { return status; }
     public PedidoRastreamentoResponse getRastreamento() { return rastreamento; }
     public LocalDateTime getCriadoEm() { return criadoEm; }
+    public LocalDateTime getEntregueEm() { return entregueEm; }
     public LocalDateTime getReservaExpiraEm() { return reservaExpiraEm; }
     public BigDecimal getSubtotal() { return subtotal; }
     public BigDecimal getDesconto() { return desconto; }

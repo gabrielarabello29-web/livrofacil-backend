@@ -316,7 +316,7 @@ class PedidoServiceTest {
     }
 
     @Test
-    void deveAplicarVoucherAoFreteEmitirSaldoNovoEImpedirDuplicidade() throws Exception {
+    void deveAplicarVoucherSomenteAProdutosEmitirSaldoResidualEImpedirDuplicidade() throws Exception {
         Pedido pedido = pedidoBase();
         pedido.setSubtotal(new BigDecimal("100.00"));
         pedido.setFrete(new BigDecimal("19.90"));
@@ -334,19 +334,23 @@ class PedidoServiceTest {
         when(voucherTrocaRepository.findByCodigoForUpdate("TR-ORIGINAL")).thenReturn(Optional.of(voucher));
         when(carrinhoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido.getCarrinho()));
         when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque(0, 1, 0)));
+        FormaPagamento forma = new FormaPagamento("Cliente", "CREDITO", "4444", "12/28", "VISA", false, cliente);
+        setField(forma, "id", 4L);
+        when(formaPagamentoRepository.findByIdAndClienteId(4L, clienteId)).thenReturn(Optional.of(forma));
+        when(bandeiraPagamentoRepository.findByNomeIgnoreCase("VISA")).thenReturn(Optional.of(new BandeiraPagamento("VISA")));
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
         var aplicacao = service.aplicarCupom(1L, clienteId, "TR-ORIGINAL");
 
-        assertEquals(new BigDecimal("119.90"), aplicacao.getDesconto());
-        assertEquals(new BigDecimal("0.00"), aplicacao.getTotal());
+        assertEquals(new BigDecimal("100.00"), aplicacao.getDesconto());
+        assertEquals(new BigDecimal("19.90"), aplicacao.getTotal());
 
         FinalizarCompraRequest request = new FinalizarCompraRequest();
         request.setCarrinhoId(1L);
-        request.setPagamentos(List.of());
+        request.setPagamentos(finalizarRequest(new BigDecimal("19.90"), 1).getPagamentos());
         var finalizacao = service.finalizar(1L, clienteId, request);
 
         assertEquals("EM_PROCESSAMENTO", finalizacao.getStatus());
-        assertEquals(new BigDecimal("30.10"), finalizacao.getVoucherSaldoGerado().getValor());
+        assertEquals(new BigDecimal("50.00"), finalizacao.getVoucherSaldoGerado().getValor());
         assertTrue(finalizacao.getVoucherSaldoGerado().getCodigo().startsWith("TR-"));
         org.junit.jupiter.api.Assertions.assertNotEquals(voucher.getCodigo(), finalizacao.getVoucherSaldoGerado().getCodigo());
         assertEquals(clienteId, voucher.getCliente().getId());

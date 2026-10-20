@@ -1,6 +1,7 @@
 package com.livrofacil.modulos.troca.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.livrofacil.modulos.troca.entity.TipoSolicitacaoTroca;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -27,6 +28,13 @@ public class SolicitarTrocaRequest {
 
     private String detalhes;
 
+    @NotNull(message = "O tipo da solicitacao e obrigatorio")
+    private TipoSolicitacaoTroca tipo;
+
+    @NotNull(message = "A quantidade e obrigatoria")
+    @Positive(message = "A quantidade deve ser maior que zero")
+    private Integer quantidade;
+
     public UUID getClienteId() { return clienteId; }
     public void setClienteId(UUID clienteId) { this.clienteId = clienteId; }
     public Long getPedidoId() { return pedidoId; }
@@ -39,4 +47,8 @@ public class SolicitarTrocaRequest {
     public void setMotivo(String motivo) { this.motivo = motivo; }
     public String getDetalhes() { return detalhes; }
     public void setDetalhes(String detalhes) { this.detalhes = detalhes; }
+    public TipoSolicitacaoTroca getTipo() { return tipo; }
+    public void setTipo(TipoSolicitacaoTroca tipo) { this.tipo = tipo; }
+    public Integer getQuantidade() { return quantidade; }
+    public void setQuantidade(Integer quantidade) { this.quantidade = quantidade; }
 }

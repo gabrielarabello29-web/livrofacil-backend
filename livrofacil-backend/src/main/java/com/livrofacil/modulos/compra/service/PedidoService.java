@@ -17,6 +17,7 @@ import com.livrofacil.modulos.troca.entity.VoucherTroca;
 import com.livrofacil.modulos.troca.repository.VoucherTrocaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -56,6 +58,7 @@ public class PedidoService {
     private final BandeiraPagamentoRepository bandeiraPagamentoRepository;
     private final VoucherTrocaRepository voucherTrocaRepository;
     private final long expiracaoCheckoutMinutos;
+    private final ZoneId zoneId;
 
     public PedidoService(PedidoRepository pedidoRepository, CarrinhoRepository carrinhoRepository,
                          ClienteRepository clienteRepository, EnderecoRepository enderecoRepository,
@@ -64,6 +67,20 @@ public class PedidoService {
                          BandeiraPagamentoRepository bandeiraPagamentoRepository,
                          VoucherTrocaRepository voucherTrocaRepository,
                          @Value("${livrofacil.checkout.expiracao-minutos:30}") long expiracaoCheckoutMinutos) {
+        this(pedidoRepository, carrinhoRepository, clienteRepository, enderecoRepository, formaPagamentoRepository,
+            estoqueRepository, cupomRepository, bandeiraPagamentoRepository, voucherTrocaRepository,
+            expiracaoCheckoutMinutos, "America/Sao_Paulo");
+        }
+
+        @Autowired
+        public PedidoService(PedidoRepository pedidoRepository, CarrinhoRepository carrinhoRepository,
+                 ClienteRepository clienteRepository, EnderecoRepository enderecoRepository,
+                 FormaPagamentoRepository formaPagamentoRepository, EstoqueRepository estoqueRepository,
+                 CupomRepository cupomRepository,
+                 BandeiraPagamentoRepository bandeiraPagamentoRepository,
+                 VoucherTrocaRepository voucherTrocaRepository,
+                 @Value("${livrofacil.checkout.expiracao-minutos:30}") long expiracaoCheckoutMinutos,
+                 @Value("${livrofacil.time-zone:America/Sao_Paulo}") String timeZone) {
         this.pedidoRepository = pedidoRepository;
         this.carrinhoRepository = carrinhoRepository;
         this.clienteRepository = clienteRepository;
@@ -74,6 +91,7 @@ public class PedidoService {
         this.bandeiraPagamentoRepository = bandeiraPagamentoRepository;
         this.voucherTrocaRepository = voucherTrocaRepository;
         this.expiracaoCheckoutMinutos = expiracaoCheckoutMinutos;
+        this.zoneId = ZoneId.of(timeZone);
     }
 
     @Transactional
@@ -195,7 +213,9 @@ public class PedidoService {
                     voucherSaldoGerado = new VoucherTroca();
                     voucherSaldoGerado.setCodigo(gerarCodigoVoucher());
                     voucherSaldoGerado.setValor(saldoRestante);
+                    voucherSaldoGerado.setValorOriginal(saldoRestante);
                     voucherSaldoGerado.setCliente(voucherResgate.getCliente());
+                    voucherSaldoGerado.setVoucherOrigem(voucherResgate);
                     voucherTrocaRepository.save(voucherSaldoGerado);
                 }
             }
@@ -224,10 +244,9 @@ public class PedidoService {
             throw new RegraDeNegocioException("A reserva do pedido expirou ou nao esta mais disponivel");
         }
         String codigoNormalizado = codigo == null ? "" : codigo.trim();
-        if (pedido.getCupom() != null && !pedido.getCupom().isBlank() && !pedido.getCupom().equalsIgnoreCase(codigoNormalizado)) {
-            if (cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(pedido.getCupom()).isPresent()) {
-                throw new RegraDeNegocioException("O pedido ja possui um cupom promocional aplicado");
-            }
+        if (pedido.getCupom() != null && !pedido.getCupom().isBlank()
+                && !pedido.getCupom().equalsIgnoreCase(codigoNormalizado)) {
+            throw new RegraDeNegocioException("O pedido ja possui um cupom aplicado");
         }
         var cupom = cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(codigoNormalizado);
         BigDecimal desconto;
@@ -243,7 +262,7 @@ public class PedidoService {
                 .orElseThrow(() -> new RegraDeNegocioException("Cupom ou voucher invalido"));
             validarVoucher(voucher, pedido, clienteId);
             codigoAplicado = voucher.getCodigo();
-            desconto = voucher.getValor().min(pedido.getSubtotal().add(pedido.getFrete()));
+            desconto = voucher.getValor().min(pedido.getSubtotal());
         }
         pedido.setCupom(codigoAplicado);
         pedido.setDesconto(desconto);
@@ -280,6 +299,10 @@ public class PedidoService {
         if (status == StatusPedido.CANCELADO) {
             cancelarELiberar(pedido);
             return new PedidoResponse(pedidoRepository.save(pedido));
+        }
+        if (status == StatusPedido.ENTREGUE && pedido.getStatus() != StatusPedido.ENTREGUE
+                && pedido.getEntregueEm() == null) {
+            pedido.setEntregueEm(LocalDateTime.now(zoneId));
         }
         pedido.setStatus(status);
         return new PedidoResponse(pedidoRepository.save(pedido));

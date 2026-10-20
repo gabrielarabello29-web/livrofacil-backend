@@ -21,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +53,7 @@ class TrocaServiceTest {
         Pedido pedido = new Pedido();
         setId(pedido, "id", 21L);
         pedido.setCliente(cliente);
+        pedido.setStatus(StatusPedido.ENTREGUE);
         Livro livro = org.mockito.Mockito.mock(Livro.class);
         org.mockito.Mockito.when(livro.getId()).thenReturn(8L);
         ItemPedido item = new ItemPedido();
@@ -66,12 +69,15 @@ class TrocaServiceTest {
         troca.setItemPedido(item);
         troca.setMotivo("Produto danificado");
         troca.setStatus(StatusTroca.AUTORIZADA);
-        when(trocaRepository.findById(41L)).thenReturn(Optional.of(troca));
+        when(voucherTrocaRepository.existsByCodigoIgnoreCase(any(String.class)))
+            .thenReturn(true, false);
+        when(trocaRepository.findByIdForUpdate(41L)).thenReturn(Optional.of(troca));
         when(trocaRepository.save(any(Troca.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.receber(41L, false);
 
-        assertEquals("TROCADA", response.getStatus());
+        assertEquals("CONCLUIDA", response.getStatus());
+        assertEquals(StatusPedido.FINALIZADO, pedido.getStatus());
         assertTrue(response.getVoucherCodigo().startsWith("TR-"));
         assertEquals(new BigDecimal("25.00"), response.getVoucherValor());
     }
@@ -89,6 +95,89 @@ class TrocaServiceTest {
         request.setPedidoId(21L);
         request.setLivroId(8L);
         request.setMotivo("Produto danificado");
+
+        assertThrows(com.livrofacil.exception.RegraDeNegocioException.class, () -> service.solicitar(request));
+        verify(trocaRepository, never()).save(any(Troca.class));
+    }
+
+    @Test
+    void deveAceitarSolicitacaoParcialNoSetimoDia() throws Exception {
+        var service = new TrocaService(trocaRepository, pedidoRepository, itemPedidoRepository,
+                estoqueRepository, voucherTrocaRepository);
+        UUID clienteId = UUID.randomUUID();
+        Pedido pedido = new Pedido();
+        Cliente cliente = new Cliente("Cliente", "cliente@email.com", "11999999999");
+        setId(cliente, "id", clienteId);
+        pedido.setCliente(cliente);
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        pedido.setEntregueEm(LocalDateTime.now(ZoneId.of("America/Sao_Paulo")).minusDays(7));
+        when(pedidoRepository.findByIdAndClienteId(21L, clienteId)).thenReturn(Optional.of(pedido));
+        Livro livro = org.mockito.Mockito.mock(Livro.class);
+        org.mockito.Mockito.when(livro.getId()).thenReturn(8L);
+        ItemPedido item = new ItemPedido();
+        setId(item, "id", 31L);
+        item.setLivro(livro);
+        item.setPedido(pedido);
+        item.setQuantidade(3);
+        item.setValorUnitario(new BigDecimal("20.00"));
+        when(itemPedidoRepository.findByIdAndPedidoId(31L, 21L)).thenReturn(Optional.of(item));
+        when(itemPedidoRepository.findByIdAndPedidoIdForUpdate(31L, 21L)).thenReturn(Optional.of(item));
+        when(trocaRepository.findByItemPedidoIdAndStatusIn(org.mockito.ArgumentMatchers.eq(31L), any()))
+                .thenReturn(List.of());
+        when(trocaRepository.save(any(Troca.class))).thenAnswer(invocation -> {
+            Troca troca = invocation.getArgument(0);
+            setId(troca, "id", 41L);
+            return troca;
+        });
+        SolicitarTrocaRequest request = new SolicitarTrocaRequest();
+        request.setClienteId(clienteId);
+        request.setPedidoId(21L);
+        request.setItemPedidoId(31L);
+        request.setQuantidade(1);
+        request.setTipo(com.livrofacil.modulos.troca.entity.TipoSolicitacaoTroca.DEVOLUCAO);
+        request.setMotivo("Arrependimento");
+
+        var response = service.solicitar(request);
+
+        assertEquals("SOLICITADA", response.getStatus());
+        assertEquals("DEVOLUCAO", response.getTipo());
+        assertEquals(1, response.getQuantidadeSolicitada());
+    }
+
+    @Test
+    void deveRejeitarPedidoEntregueSemDataDeEntrega() {
+        var service = new TrocaService(trocaRepository, pedidoRepository, itemPedidoRepository,
+                estoqueRepository, voucherTrocaRepository);
+        UUID clienteId = UUID.randomUUID();
+        Pedido pedido = new Pedido();
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        when(pedidoRepository.findByIdAndClienteId(21L, clienteId)).thenReturn(Optional.of(pedido));
+        SolicitarTrocaRequest request = new SolicitarTrocaRequest();
+        request.setClienteId(clienteId);
+        request.setPedidoId(21L);
+        request.setLivroId(8L);
+        request.setQuantidade(1);
+        request.setMotivo("Arrependimento");
+
+        assertThrows(com.livrofacil.exception.RegraDeNegocioException.class, () -> service.solicitar(request));
+        verify(trocaRepository, never()).save(any(Troca.class));
+    }
+
+    @Test
+    void deveRejeitarSolicitacaoForaDoPrazoDeSeteDias() {
+        var service = new TrocaService(trocaRepository, pedidoRepository, itemPedidoRepository,
+                estoqueRepository, voucherTrocaRepository);
+        UUID clienteId = UUID.randomUUID();
+        Pedido pedido = new Pedido();
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        pedido.setEntregueEm(LocalDateTime.now(ZoneId.of("America/Sao_Paulo")).minusDays(8));
+        when(pedidoRepository.findByIdAndClienteId(21L, clienteId)).thenReturn(Optional.of(pedido));
+        SolicitarTrocaRequest request = new SolicitarTrocaRequest();
+        request.setClienteId(clienteId);
+        request.setPedidoId(21L);
+        request.setLivroId(8L);
+        request.setQuantidade(1);
+        request.setMotivo("Arrependimento");
 
         assertThrows(com.livrofacil.exception.RegraDeNegocioException.class, () -> service.solicitar(request));
         verify(trocaRepository, never()).save(any(Troca.class));

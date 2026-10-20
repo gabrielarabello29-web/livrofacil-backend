@@ -4,7 +4,10 @@ import com.livrofacil.modulos.troca.dto.ReceberTrocaRequest;
 import com.livrofacil.modulos.troca.dto.RecusarTrocaRequest;
 import com.livrofacil.modulos.troca.dto.SolicitarTrocaRequest;
 import com.livrofacil.modulos.troca.dto.TrocaResponse;
+import com.livrofacil.modulos.troca.dto.TrocaHistoricoResponse;
 import com.livrofacil.modulos.troca.dto.VoucherTrocaResponse;
+import com.livrofacil.modulos.troca.entity.StatusTroca;
+import com.livrofacil.modulos.troca.entity.TipoSolicitacaoTroca;
 import com.livrofacil.modulos.troca.service.TrocaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -28,8 +31,10 @@ public class TrocaController {
     }
 
     @GetMapping
-    public ResponseEntity<List<TrocaResponse>> listarTodas() {
-        return ResponseEntity.ok(service.listarTodas());
+    public ResponseEntity<List<TrocaResponse>> listarTodas(
+            @RequestParam(required = false) StatusTroca status,
+            @RequestParam(required = false) TipoSolicitacaoTroca tipo) {
+        return ResponseEntity.ok(service.listarTodas(status, tipo));
     }
 
     @GetMapping("/cliente/{clienteId}")
@@ -37,9 +42,39 @@ public class TrocaController {
         return ResponseEntity.ok(service.listarCliente(clienteId));
     }
 
+    @GetMapping("/cliente/{clienteId}/{trocaId}")
+    public ResponseEntity<TrocaResponse> buscarCliente(@PathVariable UUID clienteId, @PathVariable Long trocaId) {
+        return ResponseEntity.ok(service.buscarCliente(trocaId, clienteId));
+    }
+
+    @GetMapping("/cliente/{clienteId}/{trocaId}/historico")
+    public ResponseEntity<List<TrocaHistoricoResponse>> historicoCliente(
+            @PathVariable UUID clienteId, @PathVariable Long trocaId) {
+        return ResponseEntity.ok(service.listarHistoricoCliente(trocaId, clienteId).stream()
+                .map(TrocaHistoricoResponse::new).toList());
+    }
+
+    @GetMapping("/{trocaId}")
+    public ResponseEntity<TrocaResponse> buscarAdmin(@PathVariable Long trocaId) {
+        return ResponseEntity.ok(service.buscarAdmin(trocaId));
+    }
+
+    @GetMapping("/{trocaId}/historico")
+    public ResponseEntity<List<TrocaHistoricoResponse>> historicoAdmin(
+            @PathVariable Long trocaId) {
+        return ResponseEntity.ok(service.listarHistorico(trocaId).stream()
+                .map(TrocaHistoricoResponse::new).toList());
+    }
+
     @GetMapping("/cliente/{clienteId}/vouchers")
     public ResponseEntity<List<VoucherTrocaResponse>> listarVouchersCliente(@PathVariable UUID clienteId) {
         return ResponseEntity.ok(service.listarVouchersCliente(clienteId));
+    }
+
+    @GetMapping("/cliente/{clienteId}/vouchers/{voucherId}")
+    public ResponseEntity<VoucherTrocaResponse> buscarVoucherCliente(@PathVariable UUID clienteId,
+                                                                      @PathVariable Long voucherId) {
+        return ResponseEntity.ok(service.buscarVoucherCliente(voucherId, clienteId));
     }
 
     @PatchMapping("/{trocaId}/autorizar")
@@ -55,8 +90,11 @@ public class TrocaController {
 
     @PatchMapping("/{trocaId}/receber")
     public ResponseEntity<TrocaResponse> receber(@PathVariable Long trocaId,
-                                                  @RequestBody(required = false) ReceberTrocaRequest request) {
+                              @Valid @RequestBody(required = false) ReceberTrocaRequest request) {
         boolean retornarEstoque = request != null && Boolean.TRUE.equals(request.getRetornarEstoque());
-        return ResponseEntity.ok(service.receber(trocaId, retornarEstoque));
+        Integer quantidade = request == null ? null : request.getQuantidadeRecebida();
+        return ResponseEntity.ok(quantidade == null
+            ? service.receber(trocaId, retornarEstoque)
+            : service.receber(trocaId, retornarEstoque, quantidade));
     }
 }

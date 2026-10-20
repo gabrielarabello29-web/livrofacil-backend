@@ -21,6 +21,9 @@ public class VoucherTroca {
     @Column(name = "vot_valor", nullable = false, precision = 12, scale = 2)
     private BigDecimal valor;
 
+    @Column(name = "vot_valor_original", precision = 12, scale = 2)
+    private BigDecimal valorOriginal;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cli_id", nullable = false)
     private Cliente cliente;
@@ -33,6 +36,10 @@ public class VoucherTroca {
     @JoinColumn(name = "ped_resgate_id")
     private Pedido pedidoResgate;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vot_origem_id")
+    private VoucherTroca voucherOrigem;
+
     @Column(name = "vot_criado_em", nullable = false)
     private LocalDateTime criadoEm = LocalDateTime.now();
 
@@ -44,12 +51,16 @@ public class VoucherTroca {
     public void setCodigo(String codigo) { this.codigo = codigo; }
     public BigDecimal getValor() { return valor; }
     public void setValor(BigDecimal valor) { this.valor = valor; }
+    public BigDecimal getValorOriginal() { return valorOriginal == null ? valor : valorOriginal; }
+    public void setValorOriginal(BigDecimal valorOriginal) { this.valorOriginal = valorOriginal; }
     public Cliente getCliente() { return cliente; }
     public void setCliente(Cliente cliente) { this.cliente = cliente; }
     public Troca getTroca() { return troca; }
     public void setTroca(Troca troca) { this.troca = troca; }
     public Pedido getPedidoResgate() { return pedidoResgate; }
     public void setPedidoResgate(Pedido pedidoResgate) { this.pedidoResgate = pedidoResgate; }
+    public VoucherTroca getVoucherOrigem() { return voucherOrigem; }
+    public void setVoucherOrigem(VoucherTroca voucherOrigem) { this.voucherOrigem = voucherOrigem; }
     public LocalDateTime getCriadoEm() { return criadoEm; }
     public LocalDateTime getResgatadoEm() { return resgatadoEm; }
     public void setResgatadoEm(LocalDateTime resgatadoEm) { this.resgatadoEm = resgatadoEm; }

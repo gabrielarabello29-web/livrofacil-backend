@@ -13,6 +13,7 @@ import java.util.UUID;
 
 public interface VoucherTrocaRepository extends JpaRepository<VoucherTroca, Long> {
     Optional<VoucherTroca> findByCodigoIgnoreCase(String codigo);
+    Optional<VoucherTroca> findByIdAndClienteId(Long id, UUID clienteId);
     List<VoucherTroca> findByClienteIdOrderByCriadoEmDesc(UUID clienteId);
     boolean existsByCodigoIgnoreCase(String codigo);
 

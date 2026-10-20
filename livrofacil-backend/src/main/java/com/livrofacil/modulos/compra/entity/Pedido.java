@@ -38,6 +38,9 @@ public class Pedido {
     @Column(name = "ped_atualizado_em")
     private LocalDateTime atualizadoEm = LocalDateTime.now();
 
+    @Column(name = "ped_entregue_em")
+    private LocalDateTime entregueEm;
+
     @Column(name = "ped_reserva_expira_em")
     private LocalDateTime reservaExpiraEm;
 
@@ -84,6 +87,8 @@ public class Pedido {
     }
     public LocalDateTime getCriadoEm() { return criadoEm; }
     public LocalDateTime getAtualizadoEm() { return atualizadoEm; }
+    public LocalDateTime getEntregueEm() { return entregueEm; }
+    public void setEntregueEm(LocalDateTime entregueEm) { this.entregueEm = entregueEm; }
     public void atualizarAtividade() { this.atualizadoEm = LocalDateTime.now(); }
     public LocalDateTime getReservaExpiraEm() { return reservaExpiraEm; }
     public void setReservaExpiraEm(LocalDateTime reservaExpiraEm) { this.reservaExpiraEm = reservaExpiraEm; }
