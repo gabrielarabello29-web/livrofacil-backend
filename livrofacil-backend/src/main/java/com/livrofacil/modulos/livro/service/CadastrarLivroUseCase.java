@@ -59,8 +59,8 @@ public class CadastrarLivroUseCase {
 	public LivroResponse criar(LivroRequest request) {
 		validarDadosUnicos(request.getCodigo(), request.getIsbn(), request.getCodigoBarras(), null);
 
-		Autor autor = buscarAutor(request.getAutorId());
-		Editora editora = buscarEditora(request.getEditoraId());
+		Autor autor = resolverAutor(request);
+		Editora editora = resolverEditora(request);
 		GrupoPrecificacao grupoPrecificacao = buscarGrupoPrecificacao(request.getGrupoPrecificacaoId());
 		Set<Categoria> categorias = buscarCategorias(request.getCategoriaIds());
 		Dimensao dimensao = converterDimensao(request.getDimensao());
@@ -91,7 +91,22 @@ public class CadastrarLivroUseCase {
 
 	@Transactional(readOnly = true)
 	public List<LivroResponse> listar() {
-		return livroRepository.findAll().stream()
+		return listar(null, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<LivroResponse> listar(Long autorId, Long editoraId) {
+		List<Livro> livros;
+		if (autorId != null && editoraId != null) {
+			livros = livroRepository.findByAutor_IdAndEditora_Id(autorId, editoraId);
+		} else if (autorId != null) {
+			livros = livroRepository.findByAutor_Id(autorId);
+		} else if (editoraId != null) {
+			livros = livroRepository.findByEditora_Id(editoraId);
+		} else {
+			livros = livroRepository.findAll();
+		}
+		return livros.stream()
 				.map(livro -> new LivroResponse(livro, estoqueRepository.findByLivroId(livro.getId()).orElse(null)))
 				.toList();
 	}
@@ -140,13 +155,19 @@ public class CadastrarLivroUseCase {
 	}
 
 	@Transactional(readOnly = true)
-	public List<LivroOpcaoResponse> listarAutores() {
-		return autorRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+	public List<LivroOpcaoResponse> listarAutores(String nome) {
+		List<Autor> autores = nome == null || nome.isBlank()
+				? autorRepository.findAll()
+				: autorRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return autores.stream().map(LivroOpcaoResponse::new).toList();
 	}
 
 	@Transactional(readOnly = true)
-	public List<LivroOpcaoResponse> listarEditoras() {
-		return editoraRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+	public List<LivroOpcaoResponse> listarEditoras(String nome) {
+		List<Editora> editoras = nome == null || nome.isBlank()
+				? editoraRepository.findAll()
+				: editoraRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return editoras.stream().map(LivroOpcaoResponse::new).toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -164,8 +185,8 @@ public class CadastrarLivroUseCase {
 		Livro livro = buscarLivro(id);
 		validarDadosUnicos(request.getCodigo(), request.getIsbn(), request.getCodigoBarras(), id);
 
-		Autor autor = buscarAutor(request.getAutorId());
-		Editora editora = buscarEditora(request.getEditoraId());
+		Autor autor = resolverAutor(request);
+		Editora editora = resolverEditora(request);
 		GrupoPrecificacao grupoPrecificacao = buscarGrupoPrecificacao(request.getGrupoPrecificacaoId());
 		Set<Categoria> categorias = buscarCategorias(request.getCategoriaIds());
 		Dimensao dimensao = converterDimensao(request.getDimensao());
@@ -235,9 +256,34 @@ public class CadastrarLivroUseCase {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Autor nao encontrado: " + id));
 	}
 
+	private Autor resolverAutor(LivroRequest request) {
+		if (request.getAutorId() != null) {
+			return buscarAutor(request.getAutorId());
+		}
+		String nome = normalizarNome(request.getAutorNome(), "O nome do autor e obrigatorio");
+		return autorRepository.findFirstByNomeIgnoreCase(nome)
+				.orElseGet(() -> autorRepository.save(new Autor(nome)));
+	}
+
 	private Editora buscarEditora(Long id) {
 		return editoraRepository.findById(id)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Editora nao encontrada: " + id));
+	}
+
+	private Editora resolverEditora(LivroRequest request) {
+		if (request.getEditoraId() != null) {
+			return buscarEditora(request.getEditoraId());
+		}
+		String nome = normalizarNome(request.getEditoraNome(), "O nome da editora e obrigatorio");
+		return editoraRepository.findFirstByNomeIgnoreCase(nome)
+				.orElseGet(() -> editoraRepository.save(new Editora(nome)));
+	}
+
+	private String normalizarNome(String nome, String mensagemSeAusente) {
+		if (nome == null || nome.isBlank()) {
+			throw new RegraDeNegocioException(mensagemSeAusente);
+		}
+		return nome.trim();
 	}
 
 	private GrupoPrecificacao buscarGrupoPrecificacao(Long id) {

@@ -44,8 +44,11 @@ public class LivroController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LivroResponse>> listar() {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listar());
+    public ResponseEntity<List<LivroResponse>> listar(
+            @RequestParam(required = false) Long autorId,
+            @RequestParam(required = false) Long editoraId
+    ) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.listar(autorId, editoraId));
     }
 
     @GetMapping("/ativos")
@@ -69,13 +72,13 @@ public class LivroController {
     }
 
     @GetMapping("/opcoes/autores")
-    public ResponseEntity<List<LivroOpcaoResponse>> listarAutores() {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listarAutores());
+    public ResponseEntity<List<LivroOpcaoResponse>> listarAutores(@RequestParam(required = false) String nome) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.listarAutores(nome));
     }
 
     @GetMapping("/opcoes/editoras")
-    public ResponseEntity<List<LivroOpcaoResponse>> listarEditoras() {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listarEditoras());
+    public ResponseEntity<List<LivroOpcaoResponse>> listarEditoras(@RequestParam(required = false) String nome) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.listarEditoras(nome));
     }
 
     @GetMapping("/opcoes/categorias")

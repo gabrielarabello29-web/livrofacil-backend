@@ -67,6 +67,64 @@ class CadastrarLivroUseCaseTest {
     }
 
     @Test
+    void deveCriarAutorEEditoraAoCadastrarLivroPorNome() {
+        LivroRequest request = requestComCategorias(List.of(1L));
+        request.setAutorId(null);
+        request.setEditoraId(null);
+        request.setAutorNome("  Autor Novo  ");
+        request.setEditoraNome("  Editora Nova  ");
+        Autor autor = new Autor("Autor Novo");
+        Editora editora = new Editora("Editora Nova");
+        configurarReferencias(new Autor(), new Editora("Editora"), new GrupoPrecificacao(), new Categoria("Categoria"));
+        when(autorRepository.findFirstByNomeIgnoreCase("Autor Novo")).thenReturn(Optional.empty());
+        when(autorRepository.save(any(Autor.class))).thenReturn(autor);
+        when(editoraRepository.findFirstByNomeIgnoreCase("Editora Nova")).thenReturn(Optional.empty());
+        when(editoraRepository.save(any(Editora.class))).thenReturn(editora);
+        when(livroRepository.save(any(Livro.class))).thenReturn(new Livro());
+        Estoque estoque = new Estoque(new Livro());
+        when(estoqueRepository.save(any(Estoque.class))).thenReturn(estoque);
+        when(estoqueRepository.findByLivroId(null)).thenReturn(Optional.of(estoque));
+
+        useCase.criar(request);
+
+        verify(autorRepository).save(any(Autor.class));
+        verify(editoraRepository).save(any(Editora.class));
+        verify(livroRepository).save(any(Livro.class));
+    }
+
+    @Test
+    void deveReutilizarAutorEEditoraComMesmoNome() {
+        LivroRequest request = requestComCategorias(List.of(1L));
+        request.setAutorId(null);
+        request.setEditoraId(null);
+        request.setAutorNome("Autor Existente");
+        request.setEditoraNome("Editora Existente");
+        Autor autor = new Autor("Autor Existente");
+        Editora editora = new Editora("Editora Existente");
+        configurarReferencias(new Autor(), new Editora("Editora"), new GrupoPrecificacao(), new Categoria("Categoria"));
+        when(autorRepository.findFirstByNomeIgnoreCase("Autor Existente")).thenReturn(Optional.of(autor));
+        when(editoraRepository.findFirstByNomeIgnoreCase("Editora Existente")).thenReturn(Optional.of(editora));
+        when(livroRepository.save(any(Livro.class))).thenReturn(new Livro());
+        Estoque estoque = new Estoque(new Livro());
+        when(estoqueRepository.save(any(Estoque.class))).thenReturn(estoque);
+        when(estoqueRepository.findByLivroId(null)).thenReturn(Optional.of(estoque));
+
+        useCase.criar(request);
+
+        verify(autorRepository, never()).save(any(Autor.class));
+        verify(editoraRepository, never()).save(any(Editora.class));
+    }
+
+    @Test
+    void deveExigirAutorPorIdOuNome() {
+        LivroRequest request = requestComCategorias(List.of(1L));
+        request.setAutorId(null);
+        request.setAutorNome("  ");
+
+        assertThrows(RegraDeNegocioException.class, () -> useCase.criar(request));
+    }
+
+    @Test
     void deveRejeitarCodigoDuplicado() {
         LivroRequest request = requestComCategorias(List.of(1L));
         when(livroRepository.existsByCodigo(request.getCodigo())).thenReturn(true);
@@ -125,8 +183,8 @@ class CadastrarLivroUseCaseTest {
         when(livroRepository.existsByCodigo(any())).thenReturn(false);
         when(livroRepository.existsByIsbn(any())).thenReturn(false);
         when(livroRepository.existsByCodigoBarras(any())).thenReturn(false);
-        when(autorRepository.findById(1L)).thenReturn(Optional.of(autor));
-        when(editoraRepository.findById(1L)).thenReturn(Optional.of(editora));
+        lenient().when(autorRepository.findById(1L)).thenReturn(Optional.of(autor));
+        lenient().when(editoraRepository.findById(1L)).thenReturn(Optional.of(editora));
         when(grupoPrecificacaoRepository.findById(1L)).thenReturn(Optional.of(grupo));
         lenient().when(categoriaRepository.findAllById(List.of(1L))).thenReturn(List.of(categoria));
     }

@@ -56,13 +56,17 @@ public class LivroRequest {
     @NotNull(message = "O status do livro e obrigatorio")
     private Boolean ativo;
 
-    @NotNull(message = "O autor e obrigatorio")
     @Positive(message = "O ID do autor deve ser maior que zero")
     private Long autorId;
 
-    @NotNull(message = "A editora e obrigatoria")
     @Positive(message = "O ID da editora deve ser maior que zero")
     private Long editoraId;
+
+    @Size(max = 150, message = "O nome do autor deve ter no maximo 150 caracteres")
+    private String autorNome;
+
+    @Size(max = 150, message = "O nome da editora deve ter no maximo 150 caracteres")
+    private String editoraNome;
 
     @NotNull(message = "O grupo de precificacao e obrigatorio")
     @Positive(message = "O ID do grupo de precificacao deve ser maior que zero")
@@ -172,12 +176,28 @@ public class LivroRequest {
         this.autorId = autorId;
     }
 
+    public String getAutorNome() {
+        return autorNome;
+    }
+
+    public void setAutorNome(String autorNome) {
+        this.autorNome = autorNome;
+    }
+
     public Long getEditoraId() {
         return editoraId;
     }
 
     public void setEditoraId(Long editoraId) {
         this.editoraId = editoraId;
+    }
+
+    public String getEditoraNome() {
+        return editoraNome;
+    }
+
+    public void setEditoraNome(String editoraNome) {
+        this.editoraNome = editoraNome;
     }
 
     public Long getGrupoPrecificacaoId() {
