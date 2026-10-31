@@ -142,7 +142,11 @@ O fluxo existente permite ao cliente solicitar troca de um item de pedido entreg
 
 ## Livros
 
-O CRUD ja existe. Criar com `POST /api/livros`, editar com `PUT /api/livros/{id}`. O cadastro recebe relacoes por IDs e requer capa como URL HTTP(S), nao upload.
+O CRUD ja existe. Criar com `POST /api/livros`, editar com `PUT /api/livros/{id}`. A capa e informada como URL HTTP(S), nao upload.
+
+Autor e editora podem ser informados por ID (`autorId`/`editoraId`) quando selecionados de registros existentes, ou por nome (`autorNome`/`editoraNome`) quando digitados no formulario. Se um ID vier preenchido, ele tem precedencia; sem ID, o backend procura um registro com o mesmo nome (ignorando maiusculas/minusculas e removendo espacos nas pontas) e reutiliza-o, ou cria o registro automaticamente. Envie pelo menos ID ou nome para cada campo. Nomes aceitam ate 150 caracteres. O frontend deve oferecer autocomplete e permitir confirmar o texto digitado como novo autor/editora.
+
+Para os paineis administrativos, `GET /api/livros/opcoes/autores?nome=...` e `GET /api/livros/opcoes/editoras?nome=...` pesquisam por trecho do nome, sem diferenciar maiusculas/minusculas. Sem `nome`, retornam todas as opcoes. Ao selecionar um autor/editora, busque seus livros usando `GET /api/livros?autorId={id}` ou `GET /api/livros?editoraId={id}`. Os dois filtros podem ser enviados juntos e, nesse caso, sao combinados (AND). Sem filtros, `GET /api/livros` continua listando todos os livros.
 
 Exemplo de payload:
 
@@ -159,8 +163,8 @@ Exemplo de payload:
   "codigoBarras": "7890000000000",
   "valorVenda": 49.90,
   "ativo": true,
-  "autorId": 1,
-  "editoraId": 1,
+  "autorNome": "Robert C. Martin",
+  "editoraNome": "Alta Books",
   "grupoPrecificacaoId": 1,
   "categoriaIds": [1],
   "dimensao": {
