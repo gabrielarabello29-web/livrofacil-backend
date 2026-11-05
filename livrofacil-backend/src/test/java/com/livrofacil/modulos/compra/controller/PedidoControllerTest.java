@@ -33,4 +33,28 @@ class PedidoControllerTest {
     @Test void deveBuscarAdmin() { when(service.buscarDetalheAdmin(1L)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarDetalheAdmin(1L).getStatusCode()); }
     @Test void deveAtualizarStatus() { when(service.atualizarStatus(1L, StatusPedido.FINALIZADO)).thenReturn(null); var request = new com.livrofacil.modulos.compra.dto.AtualizarStatusPedidoRequest(); request.setStatus(StatusPedido.FINALIZADO); assertEquals(HttpStatus.OK, controller.atualizarStatus(1L, request).getStatusCode()); }
     @Test void deveCancelarAdmin() { when(service.atualizarStatus(1L, StatusPedido.CANCELADO)).thenReturn(null); assertEquals(HttpStatus.OK, controller.cancelarAdmin(1L).getStatusCode()); verify(service).atualizarStatus(1L, StatusPedido.CANCELADO); }
+
+    @Test
+    void deveConsultarHistoricoVendasPorCategoria() {
+        var response = new com.livrofacil.modulos.compra.dto.HistoricoVendasPorCategoriaResponse();
+        when(service.consultarHistoricoVendasPorCategoria(java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31), List.of(1L, 2L), clienteId)).thenReturn(response);
+
+        assertEquals(HttpStatus.OK, controller.historicoVendasPorCategoria(
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 3, 31),
+                List.of(1L, 2L),
+                clienteId
+        ).getStatusCode());
+    }
+
+    @Test
+    void deveConsultarRelatorioGeralSemCategorias() {
+        var inicio = java.time.LocalDate.of(2026, 1, 1);
+        var fim = java.time.LocalDate.of(2026, 3, 31);
+        when(service.consultarHistoricoVendasPorCategoria(inicio, fim, null, clienteId))
+                .thenReturn(new com.livrofacil.modulos.compra.dto.HistoricoVendasPorCategoriaResponse());
+
+        assertEquals(HttpStatus.OK, controller.historicoVendasPorCategoria(inicio, fim, null, clienteId).getStatusCode());
+        verify(service).consultarHistoricoVendasPorCategoria(inicio, fim, null, clienteId);
+    }
 }

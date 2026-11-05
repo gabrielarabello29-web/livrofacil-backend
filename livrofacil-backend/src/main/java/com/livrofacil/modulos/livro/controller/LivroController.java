@@ -1,5 +1,7 @@
 package com.livrofacil.modulos.livro.controller;
 
+import com.livrofacil.modulos.livro.dto.CategoriaRequest;
+import com.livrofacil.modulos.livro.dto.GrupoPrecificacaoRequest;
 import com.livrofacil.modulos.livro.dto.LivroRequest;
 import com.livrofacil.modulos.livro.dto.LivroResponse;
 import com.livrofacil.modulos.livro.dto.LivroCatalogoResponse;
@@ -46,9 +48,15 @@ public class LivroController {
     @GetMapping
     public ResponseEntity<List<LivroResponse>> listar(
             @RequestParam(required = false) Long autorId,
-            @RequestParam(required = false) Long editoraId
+            @RequestParam(required = false) Long editoraId,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Long grupoPrecificacaoId
     ) {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listar(autorId, editoraId));
+        return ResponseEntity.ok(cadastrarLivroUseCase.listar(autorId, editoraId, categoriaId, grupoPrecificacaoId));
+    }
+
+    public ResponseEntity<List<LivroResponse>> listar(Long autorId, Long editoraId) {
+        return listar(autorId, editoraId, null, null);
     }
 
     @GetMapping("/ativos")
@@ -83,12 +91,32 @@ public class LivroController {
 
     @GetMapping("/opcoes/categorias")
     public ResponseEntity<List<LivroOpcaoResponse>> listarCategorias() {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listarCategorias());
+        return listarCategorias(null);
+    }
+
+    @GetMapping(value = "/opcoes/categorias", params = "nome")
+    public ResponseEntity<List<LivroOpcaoResponse>> listarCategorias(@RequestParam(required = false) String nome) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.listarCategorias(nome));
+    }
+
+    @PostMapping("/opcoes/categorias")
+    public ResponseEntity<LivroOpcaoResponse> criarCategoria(@Valid @RequestBody CategoriaRequest request) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.criarCategoria(request.getNome()));
     }
 
     @GetMapping("/opcoes/grupos-precificacao")
     public ResponseEntity<List<LivroOpcaoResponse>> listarGruposPrecificacao() {
-        return ResponseEntity.ok(cadastrarLivroUseCase.listarGruposPrecificacao());
+        return listarGruposPrecificacao(null);
+    }
+
+    @GetMapping(value = "/opcoes/grupos-precificacao", params = "nome")
+    public ResponseEntity<List<LivroOpcaoResponse>> listarGruposPrecificacao(@RequestParam(required = false) String nome) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.listarGruposPrecificacao(nome));
+    }
+
+    @PostMapping("/opcoes/grupos-precificacao")
+    public ResponseEntity<LivroOpcaoResponse> criarGrupoPrecificacao(@Valid @RequestBody GrupoPrecificacaoRequest request) {
+        return ResponseEntity.ok(cadastrarLivroUseCase.criarGrupoPrecificacao(request.getNome(), request.getPercentualMargem()));
     }
 
     @GetMapping("/buscar")

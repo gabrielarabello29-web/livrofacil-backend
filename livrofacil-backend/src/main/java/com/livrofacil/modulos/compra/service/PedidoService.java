@@ -1,5 +1,6 @@
 package com.livrofacil.modulos.compra.service;
 
+import com.livrofacil.modulos.cliente.entity.Cliente;
 import com.livrofacil.modulos.cliente.entity.Endereco;
 import com.livrofacil.modulos.cliente.entity.FormaPagamento;
 import com.livrofacil.modulos.cliente.repository.EnderecoRepository;
@@ -11,7 +12,9 @@ import com.livrofacil.modulos.compra.entity.*;
 import com.livrofacil.modulos.compra.repository.*;
 import com.livrofacil.exception.RecursoNaoEncontradoException;
 import com.livrofacil.exception.RegraDeNegocioException;
+import com.livrofacil.modulos.livro.entity.Categoria;
 import com.livrofacil.modulos.livro.entity.Estoque;
+import com.livrofacil.modulos.livro.repository.CategoriaRepository;
 import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import com.livrofacil.modulos.troca.entity.VoucherTroca;
 import com.livrofacil.modulos.troca.repository.VoucherTrocaRepository;
@@ -25,11 +28,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 
 @Service
@@ -57,6 +66,7 @@ public class PedidoService {
     private final CupomRepository cupomRepository;
     private final BandeiraPagamentoRepository bandeiraPagamentoRepository;
     private final VoucherTrocaRepository voucherTrocaRepository;
+    private final CategoriaRepository categoriaRepository;
     private final long expiracaoCheckoutMinutos;
     private final ZoneId zoneId;
 
@@ -66,19 +76,21 @@ public class PedidoService {
                          CupomRepository cupomRepository,
                          BandeiraPagamentoRepository bandeiraPagamentoRepository,
                          VoucherTrocaRepository voucherTrocaRepository,
+                         CategoriaRepository categoriaRepository,
                          @Value("${livrofacil.checkout.expiracao-minutos:30}") long expiracaoCheckoutMinutos) {
         this(pedidoRepository, carrinhoRepository, clienteRepository, enderecoRepository, formaPagamentoRepository,
             estoqueRepository, cupomRepository, bandeiraPagamentoRepository, voucherTrocaRepository,
-            expiracaoCheckoutMinutos, "America/Sao_Paulo");
-        }
+            categoriaRepository, expiracaoCheckoutMinutos, "America/Sao_Paulo");
+    }
 
-        @Autowired
-        public PedidoService(PedidoRepository pedidoRepository, CarrinhoRepository carrinhoRepository,
+    @Autowired
+    public PedidoService(PedidoRepository pedidoRepository, CarrinhoRepository carrinhoRepository,
                  ClienteRepository clienteRepository, EnderecoRepository enderecoRepository,
                  FormaPagamentoRepository formaPagamentoRepository, EstoqueRepository estoqueRepository,
                  CupomRepository cupomRepository,
                  BandeiraPagamentoRepository bandeiraPagamentoRepository,
                  VoucherTrocaRepository voucherTrocaRepository,
+                 CategoriaRepository categoriaRepository,
                  @Value("${livrofacil.checkout.expiracao-minutos:30}") long expiracaoCheckoutMinutos,
                  @Value("${livrofacil.time-zone:America/Sao_Paulo}") String timeZone) {
         this.pedidoRepository = pedidoRepository;
@@ -90,6 +102,7 @@ public class PedidoService {
         this.cupomRepository = cupomRepository;
         this.bandeiraPagamentoRepository = bandeiraPagamentoRepository;
         this.voucherTrocaRepository = voucherTrocaRepository;
+        this.categoriaRepository = categoriaRepository;
         this.expiracaoCheckoutMinutos = expiracaoCheckoutMinutos;
         this.zoneId = ZoneId.of(timeZone);
     }
@@ -292,10 +305,115 @@ public class PedidoService {
         return pedidoRepository.findAll().stream().map(PedidoResponse::new).toList();
     }
 
+    @Transactional(readOnly = true)
+    public HistoricoVendasPorCategoriaResponse consultarHistoricoVendasPorCategoria(LocalDate dataInicio, LocalDate dataFim, List<Long> categoriaIds, UUID adminId) {
+        if (adminId == null) {
+            throw new RegraDeNegocioException("O adminId e obrigatorio");
+        }
+        validarAdmin(adminId);
+        if (dataInicio == null || dataFim == null) {
+            throw new RegraDeNegocioException("As datas de inicio e fim sao obrigatorias");
+        }
+        if (dataInicio.isAfter(dataFim)) {
+            throw new RegraDeNegocioException("A data inicial nao pode ser posterior a data final");
+        }
+
+        List<Long> categoriasSelecionadas = categoriaIds == null
+                ? List.of()
+                : categoriaIds.stream().filter(Objects::nonNull).distinct().toList();
+
+        List<Categoria> categorias = categoriasSelecionadas.isEmpty()
+                ? List.of()
+                : categoriaRepository.findAllById(categoriasSelecionadas);
+        if (categorias.size() != categoriasSelecionadas.size()) {
+            throw new RegraDeNegocioException("Existe categoria informada que nao foi encontrada");
+        }
+
+        List<YearMonth> meses = gerarMesesDoPeriodo(dataInicio, dataFim);
+        Map<YearMonth, Map<Long, BigDecimal>> valoresPorMesECategoria = new TreeMap<>();
+        Map<YearMonth, BigDecimal> valoresGeraisPorMes = new TreeMap<>();
+        List<Pedido> pedidos = pedidoRepository.findEntreguesOuFinalizadosComItensNoPeriodo(
+            List.of(StatusPedido.ENTREGUE, StatusPedido.FINALIZADO),
+                dataInicio.atStartOfDay(),
+                dataFim.atTime(23, 59, 59, 999_999_999));
+
+        for (Pedido pedido : pedidos) {
+            YearMonth mes = YearMonth.from(pedido.getCriadoEm().toLocalDate());
+            if (mes.isBefore(YearMonth.from(dataInicio)) || mes.isAfter(YearMonth.from(dataFim))) {
+                continue;
+            }
+            for (ItemPedido item : pedido.getItens()) {
+                if (item == null || item.getLivro() == null) {
+                    continue;
+                }
+                BigDecimal valorDoItem = (item.getValorUnitario() == null ? BigDecimal.ZERO : item.getValorUnitario())
+                        .multiply(BigDecimal.valueOf(item.getQuantidade() == null ? 0 : item.getQuantidade()))
+                        .setScale(2, RoundingMode.HALF_UP);
+                if (categoriasSelecionadas.isEmpty()) {
+                    valoresGeraisPorMes.merge(mes, valorDoItem, BigDecimal::add);
+                    continue;
+                }
+                if (item.getLivro().getCategorias() == null || item.getLivro().getCategorias().isEmpty()) {
+                    continue;
+                }
+                List<Long> categoriasDoItem = item.getLivro().getCategorias().stream()
+                        .map(Categoria::getId)
+                        .filter(categoriasSelecionadas::contains)
+                        .distinct()
+                        .toList();
+                if (categoriasDoItem.isEmpty()) {
+                    continue;
+                }
+                BigDecimal valorPorCategoria = valorDoItem.divide(BigDecimal.valueOf(categoriasDoItem.size()), 2, RoundingMode.HALF_UP);
+                Map<Long, BigDecimal> valoresPorCategoria = valoresPorMesECategoria.computeIfAbsent(mes, ignored -> new LinkedHashMap<>());
+                for (Long categoriaId : categoriasDoItem) {
+                    valoresPorCategoria.merge(categoriaId, valorPorCategoria, BigDecimal::add);
+                }
+            }
+        }
+
+        HistoricoVendasPorCategoriaResponse response = new HistoricoVendasPorCategoriaResponse();
+        response.setDataInicio(dataInicio.toString());
+        response.setDataFim(dataFim.toString());
+        response.setMeses(meses.stream().map(YearMonth::toString).toList());
+
+        List<HistoricoVendasPorCategoriaSerie> series = new ArrayList<>();
+        if (categoriasSelecionadas.isEmpty()) {
+            HistoricoVendasPorCategoriaSerie serie = new HistoricoVendasPorCategoriaSerie();
+            serie.setCategoriaNome("Total geral");
+            serie.setValores(meses.stream()
+                .map(mes -> valoresGeraisPorMes.getOrDefault(mes, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP))
+                .toList());
+            series.add(serie);
+            response.setSeries(series);
+            return response;
+        }
+        for (Categoria categoria : categorias) {
+            HistoricoVendasPorCategoriaSerie serie = new HistoricoVendasPorCategoriaSerie();
+            serie.setCategoriaId(categoria.getId());
+            serie.setCategoriaNome(categoria.getNome());
+            List<BigDecimal> valores = new ArrayList<>();
+            for (YearMonth mes : meses) {
+                BigDecimal valor = valoresPorMesECategoria.getOrDefault(mes, Map.of()).getOrDefault(categoria.getId(), BigDecimal.ZERO);
+                valores.add(valor.setScale(2, RoundingMode.HALF_UP));
+            }
+            serie.setValores(valores);
+            series.add(serie);
+        }
+        response.setSeries(series);
+        return response;
+    }
+
     @Transactional
     public PedidoResponse atualizarStatus(Long pedidoId, StatusPedido status) {
         Pedido pedido = buscarPedido(pedidoId);
-        if (status.ordinal() < pedido.getStatus().ordinal() && status != StatusPedido.CANCELADO) throw new RegraDeNegocioException("O status do pedido nao pode retroceder");
+        if (status == null) {
+            throw new RegraDeNegocioException("O status e obrigatorio");
+        }
+        if (pedido.getStatus() == status) {
+            return new PedidoResponse(pedido);
+        }
+        validarTransicaoStatus(pedido.getStatus(), status);
         if (status == StatusPedido.CANCELADO) {
             cancelarELiberar(pedido);
             return new PedidoResponse(pedidoRepository.save(pedido));
@@ -306,6 +424,21 @@ public class PedidoService {
         }
         pedido.setStatus(status);
         return new PedidoResponse(pedidoRepository.save(pedido));
+    }
+
+    private void validarTransicaoStatus(StatusPedido atual, StatusPedido novo) {
+        if (novo == StatusPedido.CANCELADO) {
+            return;
+        }
+        if (atual == StatusPedido.CANCELADO) {
+            throw new RegraDeNegocioException("Pedido cancelado nao pode receber novo status");
+        }
+        if (novo.ordinal() < atual.ordinal()) {
+            throw new RegraDeNegocioException("O status do pedido nao pode retroceder");
+        }
+        if (novo.ordinal() != atual.ordinal() + 1) {
+            throw new RegraDeNegocioException("Transicao de status invalida: " + atual + " -> " + novo);
+        }
     }
 
     @Transactional
@@ -358,6 +491,25 @@ public class PedidoService {
             return null;
         }
         return pedido;
+    }
+
+    private void validarAdmin(UUID adminId) {
+        Cliente cliente = clienteRepository.findById(adminId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuario administrador nao encontrado: " + adminId));
+        if (!"ADMIN".equalsIgnoreCase(cliente.getPerfil())) {
+            throw new RegraDeNegocioException("Acesso negado: somente administradores");
+        }
+    }
+
+    private List<YearMonth> gerarMesesDoPeriodo(LocalDate dataInicio, LocalDate dataFim) {
+        List<YearMonth> meses = new ArrayList<>();
+        YearMonth atual = YearMonth.from(dataInicio);
+        YearMonth fim = YearMonth.from(dataFim);
+        while (!atual.isAfter(fim)) {
+            meses.add(atual);
+            atual = atual.plusMonths(1);
+        }
+        return meses;
     }
 
     private void limparChavesDeCheckoutEncerradas(Long carrinhoId, UUID clienteId) {

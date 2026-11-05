@@ -22,8 +22,10 @@ import com.livrofacil.modulos.compra.entity.StatusPedido;
 import com.livrofacil.modulos.compra.repository.CarrinhoRepository;
 import com.livrofacil.modulos.compra.repository.CupomRepository;
 import com.livrofacil.modulos.compra.repository.PedidoRepository;
+import com.livrofacil.modulos.livro.entity.Categoria;
 import com.livrofacil.modulos.livro.entity.Estoque;
 import com.livrofacil.modulos.livro.entity.Livro;
+import com.livrofacil.modulos.livro.repository.CategoriaRepository;
 import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import com.livrofacil.modulos.troca.entity.VoucherTroca;
 import com.livrofacil.modulos.troca.repository.VoucherTrocaRepository;
@@ -63,6 +65,7 @@ class PedidoServiceTest {
     @Mock private CupomRepository cupomRepository;
     @Mock private BandeiraPagamentoRepository bandeiraPagamentoRepository;
     @Mock private VoucherTrocaRepository voucherTrocaRepository;
+    @Mock private CategoriaRepository categoriaRepository;
     private PedidoService service;
 
     private final UUID clienteId = UUID.randomUUID();
@@ -71,7 +74,7 @@ class PedidoServiceTest {
     void setup() {
         service = new PedidoService(pedidoRepository, carrinhoRepository, clienteRepository, enderecoRepository,
             formaPagamentoRepository, estoqueRepository, cupomRepository, bandeiraPagamentoRepository,
-            voucherTrocaRepository, 30L);
+            voucherTrocaRepository, categoriaRepository, 30L);
     }
 
     @Test
@@ -201,6 +204,148 @@ class PedidoServiceTest {
         assertEquals(new BigDecimal("10.00"), response.getDesconto());
         org.junit.jupiter.api.Assertions.assertNull(voucher.getResgatadoEm());
         verify(voucherTrocaRepository, never()).save(voucher);
+    }
+
+    @Test
+    void deveConsultarVendasGeraisQuandoNenhumaCategoriaForSelecionada() throws Exception {
+        Cliente admin = new Cliente();
+        admin.setPerfil("ADMIN");
+        setId(admin, UUID.randomUUID());
+
+        Livro livroComCategoria = new Livro();
+        livroComCategoria.setCategorias(Set.of());
+        Livro livroSemCategoria = new Livro();
+        livroSemCategoria.setCategorias(Set.of());
+
+        Pedido pedido = new Pedido();
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        pedido.setCriadoEm(java.time.LocalDateTime.of(2026, 1, 15, 10, 0));
+        ItemPedido primeiroItem = new ItemPedido();
+        primeiroItem.setLivro(livroComCategoria);
+        primeiroItem.setQuantidade(2);
+        primeiroItem.setValorUnitario(new BigDecimal("12.50"));
+        pedido.getItens().add(primeiroItem);
+        ItemPedido segundoItem = new ItemPedido();
+        segundoItem.setLivro(livroSemCategoria);
+        segundoItem.setQuantidade(1);
+        segundoItem.setValorUnitario(new BigDecimal("10.00"));
+        pedido.getItens().add(segundoItem);
+
+        Pedido pedidoFinalizado = new Pedido();
+        pedidoFinalizado.setStatus(StatusPedido.FINALIZADO);
+        pedidoFinalizado.setCriadoEm(java.time.LocalDateTime.of(2026, 1, 20, 10, 0));
+        ItemPedido itemFinalizado = new ItemPedido();
+        itemFinalizado.setLivro(livroSemCategoria);
+        itemFinalizado.setQuantidade(1);
+        itemFinalizado.setValorUnitario(new BigDecimal("7.00"));
+        pedidoFinalizado.getItens().add(itemFinalizado);
+
+        when(clienteRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(pedidoRepository.findEntreguesOuFinalizadosComItensNoPeriodo(
+            List.of(StatusPedido.ENTREGUE, StatusPedido.FINALIZADO),
+            java.time.LocalDateTime.of(2026, 1, 1, 0, 0),
+            java.time.LocalDateTime.of(2026, 1, 31, 23, 59, 59, 999_999_999)))
+            .thenReturn(List.of(pedido, pedidoFinalizado));
+
+        var response = service.consultarHistoricoVendasPorCategoria(
+            java.time.LocalDate.of(2026, 1, 1),
+            java.time.LocalDate.of(2026, 1, 31),
+            List.of(),
+            admin.getId());
+
+        assertEquals(1, response.getSeries().size());
+        assertEquals("Total geral", response.getSeries().get(0).getCategoriaNome());
+        assertEquals(new BigDecimal("42.00"), response.getSeries().get(0).getValores().get(0));
+        verify(categoriaRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void deveConsultarHistoricoVendasPorCategoriaParaPedidosEntregues() throws Exception {
+        Cliente admin = new Cliente();
+        admin.setPerfil("ADMIN");
+        setId(admin, UUID.randomUUID());
+
+        Categoria romance = new Categoria("Romance");
+        setId(romance, 1L);
+        Categoria tecnologia = new Categoria("Tecnologia");
+        setId(tecnologia, 2L);
+
+        Livro livroRomance = new Livro();
+        livroRomance.setId(10L);
+        livroRomance.setTitulo("Livro Romance");
+        livroRomance.setCategorias(Set.of(romance));
+        livroRomance.setValorVenda(new BigDecimal("50.00"));
+
+        Livro livroTecnologia = new Livro();
+        livroTecnologia.setId(11L);
+        livroTecnologia.setTitulo("Livro Tecnologia");
+        livroTecnologia.setCategorias(Set.of(tecnologia));
+        livroTecnologia.setValorVenda(new BigDecimal("80.00"));
+
+        Pedido pedidoJaneiro = new Pedido();
+        pedidoJaneiro.setStatus(StatusPedido.ENTREGUE);
+        pedidoJaneiro.setCriadoEm(java.time.LocalDateTime.of(2026, 1, 15, 10, 0));
+        ItemPedido itemJaneiro1 = new ItemPedido();
+        itemJaneiro1.setLivro(livroRomance);
+        itemJaneiro1.setQuantidade(1);
+        itemJaneiro1.setValorUnitario(new BigDecimal("50.00"));
+        itemJaneiro1.setPedido(pedidoJaneiro);
+        pedidoJaneiro.getItens().add(itemJaneiro1);
+
+        Pedido pedidoFevereiro = new Pedido();
+        pedidoFevereiro.setStatus(StatusPedido.ENTREGUE);
+        pedidoFevereiro.setCriadoEm(java.time.LocalDateTime.of(2026, 2, 10, 10, 0));
+        ItemPedido itemFevereiro1 = new ItemPedido();
+        itemFevereiro1.setLivro(livroTecnologia);
+        itemFevereiro1.setQuantidade(1);
+        itemFevereiro1.setValorUnitario(new BigDecimal("80.00"));
+        itemFevereiro1.setPedido(pedidoFevereiro);
+        pedidoFevereiro.getItens().add(itemFevereiro1);
+
+        Pedido pedidoNaoEntregue = new Pedido();
+        pedidoNaoEntregue.setStatus(StatusPedido.EM_PROCESSAMENTO);
+        pedidoNaoEntregue.setCriadoEm(java.time.LocalDateTime.of(2026, 2, 15, 10, 0));
+        ItemPedido itemNaoEntregue = new ItemPedido();
+        itemNaoEntregue.setLivro(livroTecnologia);
+        itemNaoEntregue.setQuantidade(1);
+        itemNaoEntregue.setValorUnitario(new BigDecimal("80.00"));
+        itemNaoEntregue.setPedido(pedidoNaoEntregue);
+        pedidoNaoEntregue.getItens().add(itemNaoEntregue);
+
+        Pedido pedidoFinalizado = new Pedido();
+        pedidoFinalizado.setStatus(StatusPedido.FINALIZADO);
+        pedidoFinalizado.setCriadoEm(java.time.LocalDateTime.of(2026, 3, 10, 10, 0));
+        ItemPedido itemFinalizado = new ItemPedido();
+        itemFinalizado.setLivro(livroRomance);
+        itemFinalizado.setQuantidade(1);
+        itemFinalizado.setValorUnitario(new BigDecimal("30.00"));
+        pedidoFinalizado.getItens().add(itemFinalizado);
+
+        when(clienteRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(categoriaRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(romance, tecnologia));
+        when(pedidoRepository.findEntreguesOuFinalizadosComItensNoPeriodo(
+            List.of(StatusPedido.ENTREGUE, StatusPedido.FINALIZADO),
+            java.time.LocalDateTime.of(2026, 1, 1, 0, 0),
+            java.time.LocalDateTime.of(2026, 3, 31, 23, 59, 59, 999_999_999)))
+            .thenReturn(List.of(pedidoJaneiro, pedidoFevereiro, pedidoFinalizado));
+
+        var response = service.consultarHistoricoVendasPorCategoria(
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 3, 31),
+                List.of(1L, 2L),
+                admin.getId()
+        );
+
+        assertEquals(List.of("2026-01", "2026-02", "2026-03"), response.getMeses());
+        assertEquals(2, response.getSeries().size());
+        assertEquals("Romance", response.getSeries().get(0).getCategoriaNome());
+        assertEquals(new BigDecimal("50.00"), response.getSeries().get(0).getValores().get(0));
+        assertEquals(new BigDecimal("0.00"), response.getSeries().get(0).getValores().get(1));
+        assertEquals(new BigDecimal("30.00"), response.getSeries().get(0).getValores().get(2));
+        assertEquals("Tecnologia", response.getSeries().get(1).getCategoriaNome());
+        assertEquals(new BigDecimal("0.00"), response.getSeries().get(1).getValores().get(0));
+        assertEquals(new BigDecimal("80.00"), response.getSeries().get(1).getValores().get(1));
+        assertEquals(new BigDecimal("0.00"), response.getSeries().get(1).getValores().get(2));
     }
 
     @Test
@@ -430,6 +575,15 @@ class PedidoServiceTest {
     }
 
     @Test
+    void deveRejeitarTransicaoDiretaParaEntregue() {
+        Pedido pedido = new Pedido();
+        pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+        assertThrows(RegraDeNegocioException.class, () -> service.atualizarStatus(1L, StatusPedido.ENTREGUE));
+    }
+
+    @Test
     void deveAtualizarRastreamentoQuandoStatusDoPedidoMudar() throws Exception {
         Pedido pedido = pedidoSemItens();
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
@@ -560,9 +714,7 @@ class PedidoServiceTest {
     }
 
     private void setId(Object target, Object id) throws Exception {
-        Field field = target instanceof Pedido ? Pedido.class.getDeclaredField("id")
-                : target instanceof Carrinho ? Carrinho.class.getDeclaredField("id")
-                : Cliente.class.getDeclaredField("id");
+        Field field = target.getClass().getDeclaredField("id");
         field.setAccessible(true);
         field.set(target, id);
     }

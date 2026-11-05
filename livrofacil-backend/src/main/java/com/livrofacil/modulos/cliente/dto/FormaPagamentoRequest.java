@@ -18,8 +18,7 @@ public class FormaPagamentoRequest {
     @Pattern(regexp = "^\\d{4} \\d{4} \\d{4} \\d{4}$", message = "O numero do cartao deve seguir o formato 1111 1111 1111 1111")
     private String numeroCartao;
 
-    @NotBlank(message = "O codigo de seguranca e obrigatorio")
-    @Pattern(regexp = "^\\d{3,4}$", message = "O codigo de seguranca deve conter 3 ou 4 digitos")
+    @Pattern(regexp = "^(|\\d{3,4})$", message = "O codigo de seguranca deve conter 3 ou 4 digitos")
     private String codigoSeguranca;
 
     @NotBlank(message = "A validade do cartao e obrigatoria")

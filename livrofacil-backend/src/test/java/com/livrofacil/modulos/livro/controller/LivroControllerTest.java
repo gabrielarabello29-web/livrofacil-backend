@@ -19,11 +19,11 @@ class LivroControllerTest {
     @Mock private CadastrarLivroUseCase useCase;
     @InjectMocks private LivroController controller;
 
-    @Test void deveListar() { when(useCase.listar(null, null)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listar(null, null).getStatusCode()); }
+    @Test void deveListar() { when(useCase.listar(null, null, null, null)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listar(null, null).getStatusCode()); }
     @Test void deveFiltrarPorAutorEEditora() {
-        when(useCase.listar(2L, 3L)).thenReturn(List.of());
+        when(useCase.listar(2L, 3L, null, null)).thenReturn(List.of());
         assertEquals(HttpStatus.OK, controller.listar(2L, 3L).getStatusCode());
-        verify(useCase).listar(2L, 3L);
+        verify(useCase).listar(2L, 3L, null, null);
     }
     @Test void deveListarAtivos() { when(useCase.listarAtivos()).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarAtivos().getStatusCode()); }
     @Test void deveListarCatalogo() { when(useCase.listarCatalogo()).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarCatalogo().getStatusCode()); }
@@ -31,8 +31,8 @@ class LivroControllerTest {
     @Test void deveBuscarLivroCatalogo() { when(useCase.buscarNoCatalogo(1L)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarLivroCatalogo(1L).getStatusCode()); }
     @Test void deveListarAutores() { when(useCase.listarAutores("martin")).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarAutores("martin").getStatusCode()); }
     @Test void deveListarEditoras() { when(useCase.listarEditoras("books")).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarEditoras("books").getStatusCode()); }
-    @Test void deveListarCategorias() { when(useCase.listarCategorias()).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarCategorias().getStatusCode()); }
-    @Test void deveListarGrupos() { when(useCase.listarGruposPrecificacao()).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarGruposPrecificacao().getStatusCode()); }
+    @Test void deveListarCategorias() { when(useCase.listarCategorias(null)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarCategorias().getStatusCode()); }
+    @Test void deveListarGrupos() { when(useCase.listarGruposPrecificacao(null)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarGruposPrecificacao().getStatusCode()); }
     @Test void deveBuscarPorTitulo() { when(useCase.buscarPorTitulo("Livro")).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.buscarPorTitulo("Livro").getStatusCode()); }
     @Test void deveBuscarPorId() { when(useCase.buscarPorId(1L)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarPorId(1L).getStatusCode()); }
     @Test void deveBuscarEstoque() { when(useCase.buscarEstoque(1L)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarEstoque(1L).getStatusCode()); }

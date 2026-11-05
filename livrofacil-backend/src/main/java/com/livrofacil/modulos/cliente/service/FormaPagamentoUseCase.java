@@ -159,7 +159,10 @@ public class FormaPagamentoUseCase {
     }
 
     private void validarCodigoSeguranca(String codigoSeguranca) {
-        if (codigoSeguranca == null || !codigoSeguranca.matches("\\d{3,4}")) {
+        if (codigoSeguranca == null || codigoSeguranca.isBlank()) {
+            return;
+        }
+        if (!codigoSeguranca.matches("\\d{3,4}")) {
             throw new RegraDeNegocioException("O codigo de seguranca do cartao deve conter 3 ou 4 digitos");
         }
     }

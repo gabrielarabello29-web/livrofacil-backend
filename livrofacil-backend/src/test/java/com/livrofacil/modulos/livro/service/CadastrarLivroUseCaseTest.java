@@ -125,6 +125,54 @@ class CadastrarLivroUseCaseTest {
     }
 
     @Test
+    void deveCriarCategoriaEGrupoAoCadastrarLivroPorNome() {
+        LivroRequest request = requestComCategorias(List.of());
+        request.setCategoriaIds(null);
+        request.setCategoriaNomes(List.of("Categoria Nova"));
+        request.setGrupoPrecificacaoId(null);
+        request.setGrupoPrecificacaoNome("Grupo Novo");
+        request.setGrupoPrecificacaoPercentualMargem(new BigDecimal("35.50"));
+
+        configurarReferencias(new Autor(), new Editora("Editora"), new GrupoPrecificacao(), new Categoria("Categoria"));
+        when(categoriaRepository.findFirstByNomeIgnoreCase("Categoria Nova")).thenReturn(Optional.empty());
+        when(categoriaRepository.save(any(Categoria.class))).thenReturn(new Categoria("Categoria Nova"));
+        when(grupoPrecificacaoRepository.findFirstByNomeIgnoreCase("Grupo Novo")).thenReturn(Optional.empty());
+        when(grupoPrecificacaoRepository.save(any(GrupoPrecificacao.class))).thenReturn(new GrupoPrecificacao("Grupo Novo", new BigDecimal("35.50")));
+        when(livroRepository.save(any(Livro.class))).thenReturn(new Livro());
+        Estoque estoque = new Estoque(new Livro());
+        when(estoqueRepository.save(any(Estoque.class))).thenReturn(estoque);
+        when(estoqueRepository.findByLivroId(null)).thenReturn(Optional.of(estoque));
+
+        useCase.criar(request);
+
+        verify(categoriaRepository).save(any(Categoria.class));
+        verify(grupoPrecificacaoRepository).save(any(GrupoPrecificacao.class));
+    }
+
+    @Test
+    void deveReutilizarCategoriaEGrupoComMesmoNome() {
+        LivroRequest request = requestComCategorias(List.of());
+        request.setCategoriaIds(null);
+        request.setCategoriaNomes(List.of("Categoria Existente"));
+        request.setGrupoPrecificacaoId(null);
+        request.setGrupoPrecificacaoNome("Grupo Existente");
+        request.setGrupoPrecificacaoPercentualMargem(new BigDecimal("12.00"));
+
+        configurarReferencias(new Autor(), new Editora("Editora"), new GrupoPrecificacao(), new Categoria("Categoria"));
+        when(categoriaRepository.findFirstByNomeIgnoreCase("Categoria Existente")).thenReturn(Optional.of(new Categoria("Categoria Existente")));
+        when(grupoPrecificacaoRepository.findFirstByNomeIgnoreCase("Grupo Existente")).thenReturn(Optional.of(new GrupoPrecificacao("Grupo Existente", new BigDecimal("12.00"))));
+        when(livroRepository.save(any(Livro.class))).thenReturn(new Livro());
+        Estoque estoque = new Estoque(new Livro());
+        when(estoqueRepository.save(any(Estoque.class))).thenReturn(estoque);
+        when(estoqueRepository.findByLivroId(null)).thenReturn(Optional.of(estoque));
+
+        useCase.criar(request);
+
+        verify(categoriaRepository, never()).save(any(Categoria.class));
+        verify(grupoPrecificacaoRepository, never()).save(any(GrupoPrecificacao.class));
+    }
+
+    @Test
     void deveRejeitarCodigoDuplicado() {
         LivroRequest request = requestComCategorias(List.of(1L));
         when(livroRepository.existsByCodigo(request.getCodigo())).thenReturn(true);
@@ -185,7 +233,7 @@ class CadastrarLivroUseCaseTest {
         when(livroRepository.existsByCodigoBarras(any())).thenReturn(false);
         lenient().when(autorRepository.findById(1L)).thenReturn(Optional.of(autor));
         lenient().when(editoraRepository.findById(1L)).thenReturn(Optional.of(editora));
-        when(grupoPrecificacaoRepository.findById(1L)).thenReturn(Optional.of(grupo));
+        lenient().when(grupoPrecificacaoRepository.findById(1L)).thenReturn(Optional.of(grupo));
         lenient().when(categoriaRepository.findAllById(List.of(1L))).thenReturn(List.of(categoria));
     }
 

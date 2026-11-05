@@ -86,7 +86,9 @@ public class Pedido {
         }
     }
     public LocalDateTime getCriadoEm() { return criadoEm; }
+    public void setCriadoEm(LocalDateTime criadoEm) { this.criadoEm = criadoEm; }
     public LocalDateTime getAtualizadoEm() { return atualizadoEm; }
+    public void setAtualizadoEm(LocalDateTime atualizadoEm) { this.atualizadoEm = atualizadoEm; }
     public LocalDateTime getEntregueEm() { return entregueEm; }
     public void setEntregueEm(LocalDateTime entregueEm) { this.entregueEm = entregueEm; }
     public void atualizarAtividade() { this.atualizadoEm = LocalDateTime.now(); }

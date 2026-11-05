@@ -63,7 +63,7 @@ public class Livro {
     @Embedded
     private Dimensao dimensao;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "livro_categoria",
             joinColumns = @JoinColumn(name = "liv_id"),
@@ -110,6 +110,10 @@ public class Livro {
 
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getCodigo() {
