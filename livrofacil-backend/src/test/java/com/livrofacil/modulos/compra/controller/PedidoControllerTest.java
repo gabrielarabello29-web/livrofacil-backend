@@ -1,6 +1,7 @@
 package com.livrofacil.modulos.compra.controller;
 
 import com.livrofacil.modulos.compra.entity.StatusPedido;
+import com.livrofacil.modulos.compra.dto.AplicarCupomRequest;
 import com.livrofacil.modulos.compra.service.PedidoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ class PedidoControllerTest {
 
     @Test void deveIniciar() { when(service.iniciar(null)).thenReturn(null); assertEquals(HttpStatus.CREATED, controller.iniciar(null).getStatusCode()); }
     @Test void deveFinalizar() { when(service.finalizar(1L, clienteId, null)).thenReturn(null); assertEquals(HttpStatus.OK, controller.finalizar(1L, clienteId, null).getStatusCode()); }
+    @Test void deveAplicarCupom() { when(service.aplicarCupom(1L, clienteId, "DESC10")).thenReturn(null); var request = new AplicarCupomRequest(); request.setCodigo("DESC10"); assertEquals(HttpStatus.OK, controller.aplicarCupom(1L, clienteId, request).getStatusCode()); }
     @Test void deveListarCliente() { when(service.listarCliente(clienteId)).thenReturn(List.of()); assertEquals(HttpStatus.OK, controller.listarCliente(clienteId).getStatusCode()); }
     @Test void deveBuscarCliente() { when(service.buscarDetalhe(1L, clienteId)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarCliente(1L, clienteId).getStatusCode()); }
     @Test void deveCancelar() { when(service.cancelarCliente(1L, clienteId)).thenReturn(null); assertEquals(HttpStatus.OK, controller.cancelar(1L, clienteId).getStatusCode()); }
@@ -31,4 +33,28 @@ class PedidoControllerTest {
     @Test void deveBuscarAdmin() { when(service.buscarDetalheAdmin(1L)).thenReturn(null); assertEquals(HttpStatus.OK, controller.buscarDetalheAdmin(1L).getStatusCode()); }
     @Test void deveAtualizarStatus() { when(service.atualizarStatus(1L, StatusPedido.FINALIZADO)).thenReturn(null); var request = new com.livrofacil.modulos.compra.dto.AtualizarStatusPedidoRequest(); request.setStatus(StatusPedido.FINALIZADO); assertEquals(HttpStatus.OK, controller.atualizarStatus(1L, request).getStatusCode()); }
     @Test void deveCancelarAdmin() { when(service.atualizarStatus(1L, StatusPedido.CANCELADO)).thenReturn(null); assertEquals(HttpStatus.OK, controller.cancelarAdmin(1L).getStatusCode()); verify(service).atualizarStatus(1L, StatusPedido.CANCELADO); }
+
+    @Test
+    void deveConsultarHistoricoVendasPorCategoria() {
+        var response = new com.livrofacil.modulos.compra.dto.HistoricoVendasPorCategoriaResponse();
+        when(service.consultarHistoricoVendasPorCategoria(java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31), List.of(1L, 2L), clienteId)).thenReturn(response);
+
+        assertEquals(HttpStatus.OK, controller.historicoVendasPorCategoria(
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 3, 31),
+                List.of(1L, 2L),
+                clienteId
+        ).getStatusCode());
+    }
+
+    @Test
+    void deveConsultarRelatorioGeralSemCategorias() {
+        var inicio = java.time.LocalDate.of(2026, 1, 1);
+        var fim = java.time.LocalDate.of(2026, 3, 31);
+        when(service.consultarHistoricoVendasPorCategoria(inicio, fim, null, clienteId))
+                .thenReturn(new com.livrofacil.modulos.compra.dto.HistoricoVendasPorCategoriaResponse());
+
+        assertEquals(HttpStatus.OK, controller.historicoVendasPorCategoria(inicio, fim, null, clienteId).getStatusCode());
+        verify(service).consultarHistoricoVendasPorCategoria(inicio, fim, null, clienteId);
+    }
 }

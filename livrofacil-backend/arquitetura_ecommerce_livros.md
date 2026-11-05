@@ -772,30 +772,9 @@ Livro 1 ── 1 Estoque
 
 ## 5.6 Troca / devolução
 
-Estrutura de domínio prevista, mas ainda não consolidada em fluxo real de negócio.
+O fluxo de troca é persistido e vinculado ao pedido e ao item comprado. A solicitação exige pedido entregue; o administrador autoriza ou recusa; após autorização e recebimento, o sistema emite um voucher de valor fixo igual ao preço histórico do item multiplicado pela quantidade comprada.
 
-### O que existe no projeto
-
-- módulo `troca` presente na estrutura do projeto;
-- modelos organizados por domínio, mas sem implementação funcional completa em `controller`, `service` e `repository` verificáveis.
-
-### Fluxo esperado
-
-```text
-Pedido entregue
-   ↓
-Solicitação de troca
-   ↓
-Validação da troca
-   ↓
-Autorização
-   ↓
-Recebimento do produto
-   ↓
-Atualização do status
-```
-
-Ainda está como evolução futura do sistema.
+O voucher é vinculado ao cliente, tem uso único e pode ser aplicado como crédito no checkout. O recebimento pode opcionalmente devolver a quantidade ao estoque.
 
 ---
 
@@ -1425,29 +1404,27 @@ NOTIFICACAO
 
 # 16. API REST inicial
 
-## Livros
+# 7. Trocas
+
+Fluxo implementado:
 
 ```text
-GET    /api/livros
-GET    /api/livros/{id}
-POST   /api/livros
-PUT    /api/livros/{id}
-PATCH  /api/livros/{id}/ativar
-PATCH  /api/livros/{id}/inativar
+Pedido ENTREGUE
+   ↓
+POST /api/trocas (clienteId, pedidoId, itemPedidoId ou livroId, motivo)
+   ↓
+SOLICITADA
+   ↓
+PATCH /api/trocas/{id}/autorizar ou /recusar
+   ↓
+AUTORIZADA
+   ↓
+PATCH /api/trocas/{id}/receber
+   ↓
+TROCADA + voucher de valor fixo
 ```
 
-## Clientes
-
-A implementação real do módulo cliente possui os seguintes endpoints e estruturas em `controller` e `service`:
-
-```text
-POST   /api/clientes
-GET    /api/clientes
-GET    /api/clientes/buscar
-GET    /api/clientes/{id}
-POST   /api/clientes/login
-PUT    /api/clientes/{id}
-PATCH  /api/clientes/{id}/senha
+O voucher é retornado na resposta da troca (`voucherCodigo`, `voucherValor`) e pode ser validado em `POST /api/cupons/validar`, aplicado em `POST /api/pedidos/{id}/cupons?clienteId=...` e consumido na finalização do pedido.
 DELETE /api/clientes/{id}
 ```
 
@@ -1493,8 +1470,12 @@ GET    /api/estoque
 ```text
 POST   /api/trocas
 GET    /api/trocas
+GET    /api/trocas/cliente/{clienteId}
 PATCH  /api/trocas/{id}/autorizar
+PATCH  /api/trocas/{id}/recusar
 PATCH  /api/trocas/{id}/receber
+POST   /api/cupons/validar
+POST   /api/pedidos/{id}/cupons?clienteId={uuid}
 ```
 
 ## Análise

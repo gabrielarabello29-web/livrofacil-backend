@@ -33,7 +33,7 @@ public class EnderecoUseCase {
         Endereco endereco = new Endereco(
             request.getTipoEndereco(), request.getLogradouro(), request.getNumero(), request.getComplemento(),
                 request.getBairro(), request.getCidade(), request.getEstado(), request.getCep(),
-                request.isPrincipal(), cliente
+                request.getPais(), request.getObservacoes(), request.isPrincipal(), cliente
         );
         return new EnderecoResponse(enderecoRepository.save(endereco));
     }
@@ -65,6 +65,8 @@ public class EnderecoUseCase {
         endereco.setCidade(request.getCidade());
         endereco.setEstado(request.getEstado());
         endereco.setCep(request.getCep());
+        endereco.setPais(request.getPais());
+        endereco.setObservacoes(request.getObservacoes());
         endereco.setPrincipal(request.isPrincipal());
         return new EnderecoResponse(enderecoRepository.save(endereco));
     }

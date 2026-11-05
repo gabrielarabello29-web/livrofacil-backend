@@ -38,6 +38,9 @@ public class Pedido {
     @Column(name = "ped_atualizado_em")
     private LocalDateTime atualizadoEm = LocalDateTime.now();
 
+    @Column(name = "ped_entregue_em")
+    private LocalDateTime entregueEm;
+
     @Column(name = "ped_reserva_expira_em")
     private LocalDateTime reservaExpiraEm;
 
@@ -46,6 +49,9 @@ public class Pedido {
 
     @Column(name = "ped_desconto", nullable = false, precision = 12, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;
+
+    @Column(name = "ped_frete", nullable = false, precision = 12, scale = 2)
+    private BigDecimal frete = BigDecimal.ZERO;
 
     @Column(name = "ped_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
@@ -73,9 +79,18 @@ public class Pedido {
     public Long getCheckoutChave() { return checkoutChave; }
     public void setCheckoutChave(Long checkoutChave) { this.checkoutChave = checkoutChave; }
     public StatusPedido getStatus() { return status; }
-    public void setStatus(StatusPedido status) { this.status = status; }
+    public void setStatus(StatusPedido status) {
+        if (this.status != status) {
+            this.status = status;
+            this.atualizadoEm = LocalDateTime.now();
+        }
+    }
     public LocalDateTime getCriadoEm() { return criadoEm; }
+    public void setCriadoEm(LocalDateTime criadoEm) { this.criadoEm = criadoEm; }
     public LocalDateTime getAtualizadoEm() { return atualizadoEm; }
+    public void setAtualizadoEm(LocalDateTime atualizadoEm) { this.atualizadoEm = atualizadoEm; }
+    public LocalDateTime getEntregueEm() { return entregueEm; }
+    public void setEntregueEm(LocalDateTime entregueEm) { this.entregueEm = entregueEm; }
     public void atualizarAtividade() { this.atualizadoEm = LocalDateTime.now(); }
     public LocalDateTime getReservaExpiraEm() { return reservaExpiraEm; }
     public void setReservaExpiraEm(LocalDateTime reservaExpiraEm) { this.reservaExpiraEm = reservaExpiraEm; }
@@ -83,6 +98,8 @@ public class Pedido {
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
     public BigDecimal getDesconto() { return desconto; }
     public void setDesconto(BigDecimal desconto) { this.desconto = desconto; }
+    public BigDecimal getFrete() { return frete == null ? BigDecimal.ZERO : frete; }
+    public void setFrete(BigDecimal frete) { this.frete = frete == null ? BigDecimal.ZERO : frete; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
     public String getCupom() { return cupom; }

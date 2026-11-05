@@ -14,6 +14,12 @@ public class EnderecoRequest {
     @Size(max = 150, message = "O logradouro deve ter no maximo 150 caracteres")
     private String logradouro;
 
+    @Size(max = 100, message = "O pais deve ter no maximo 100 caracteres")
+    private String pais;
+
+    @Size(max = 500, message = "As observacoes devem ter no maximo 500 caracteres")
+    private String observacoes;
+
     @NotBlank(message = "O numero e obrigatorio")
     @Pattern(regexp = "^(?:\\d+[A-Za-z]?|S/N)$", message = "O numero deve ser numerico, como 100, 100A ou S/N")
     private String numero;
@@ -41,7 +47,15 @@ public class EnderecoRequest {
     public String getLogradouro() { return logradouro; }
     public String getTipoEndereco() { return tipoEndereco; }
     public void setTipoEndereco(String tipoEndereco) { this.tipoEndereco = tipoEndereco; }
+    public String getTipoResidencia() { return getTipoEndereco(); }
+    public void setTipoResidencia(String tipoResidencia) { setTipoEndereco(tipoResidencia); }
     public void setLogradouro(String logradouro) { this.logradouro = logradouro; }
+    public String getTipoLogradouro() { return getLogradouro(); }
+    public void setTipoLogradouro(String tipoLogradouro) { setLogradouro(tipoLogradouro); }
+    public String getPais() { return pais; }
+    public void setPais(String pais) { this.pais = pais; }
+    public String getObservacoes() { return observacoes; }
+    public void setObservacoes(String observacoes) { this.observacoes = observacoes; }
     public String getNumero() { return numero; }
     public void setNumero(String numero) { this.numero = numero; }
     public String getComplemento() { return complemento; }
