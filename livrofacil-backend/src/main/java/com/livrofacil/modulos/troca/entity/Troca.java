@@ -40,7 +40,7 @@ public class Troca {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tro_status", nullable = false, length = 20)
-    private StatusTroca status = StatusTroca.SOLICITADA;
+    private StatusTroca status = StatusTroca.EM_TROCA;
 
     @Column(name = "tro_criado_em", nullable = false)
     private LocalDateTime criadoEm = LocalDateTime.now();

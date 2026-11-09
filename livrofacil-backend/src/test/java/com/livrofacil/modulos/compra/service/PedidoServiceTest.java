@@ -540,7 +540,7 @@ class PedidoServiceTest {
     void deveCancelarPedidoEReporEstoque() throws Exception {
         Pedido pedido = pedidoBase();
         Estoque estoque = estoque(2, 1, 0);
-        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pedido));
         when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque));
         when(pedidoRepository.save(pedido)).thenReturn(pedido);
 
@@ -555,7 +555,7 @@ class PedidoServiceTest {
     void deveNaoGerarEstoqueBloqueadoNegativoQuandoAReservaJaFoiLiberada() throws Exception {
         Pedido pedido = pedidoBase();
         Estoque estoque = estoque(2, 0, 0);
-        when(pedidoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pedido));
         when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.of(estoque));
         when(pedidoRepository.save(pedido)).thenReturn(pedido);
 
@@ -569,7 +569,7 @@ class PedidoServiceTest {
     void deveRejeitarRetrocessoDeStatus() {
         Pedido pedido = new Pedido();
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
-        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pedido));
 
         assertThrows(RegraDeNegocioException.class, () -> service.atualizarStatus(1L, StatusPedido.PENDENTE));
     }
@@ -578,7 +578,7 @@ class PedidoServiceTest {
     void deveRejeitarTransicaoDiretaParaEntregue() {
         Pedido pedido = new Pedido();
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
-        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pedido));
 
         assertThrows(RegraDeNegocioException.class, () -> service.atualizarStatus(1L, StatusPedido.ENTREGUE));
     }
@@ -589,12 +589,12 @@ class PedidoServiceTest {
         pedido.setStatus(StatusPedido.EM_PROCESSAMENTO);
         LocalDateTime ultimaModificacao = LocalDateTime.now().minusHours(1);
         setField(pedido, "atualizadoEm", ultimaModificacao);
-        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pedido));
         when(pedidoRepository.save(pedido)).thenReturn(pedido);
 
-        var response = service.atualizarStatus(1L, StatusPedido.PAGAMENTO_APROVADO);
+        var response = service.atualizarStatus(1L, StatusPedido.APROVADA);
 
-        assertEquals(StatusPedido.PAGAMENTO_APROVADO.name(), response.getRastreamento().getEtapa());
+        assertEquals(StatusPedido.APROVADA.name(), response.getRastreamento().getEtapa());
         assertTrue(response.getRastreamento().getUltimaModificacao().isAfter(ultimaModificacao));
     }
 
@@ -620,7 +620,7 @@ class PedidoServiceTest {
     @Test
     void deveExpirarReservasEExcluirPedidos() throws Exception {
         Pedido pedido = pedidoBase();
-        when(pedidoRepository.findByStatusInAndAtualizadoEmBefore(any(Set.class), any(LocalDateTime.class)))
+        when(pedidoRepository.findByStatusInAndReservaExpiraEmBefore(any(Set.class), any(LocalDateTime.class)))
                 .thenReturn(List.of(pedido));
         when(estoqueRepository.findWithLockByLivroId(3L)).thenReturn(Optional.empty());
 
@@ -628,6 +628,26 @@ class PedidoServiceTest {
 
         verify(pedidoRepository).delete(pedido);
         assertEquals(StatusPedido.CANCELADO, pedido.getStatus());
+    }
+
+    @Test
+    void deveReutilizarPedidoEnquantoReservaNaoExpirouMesmoComAtividadeAntiga() throws Exception {
+        Pedido pedido = pedidoBase();
+        LocalDateTime reservaExpiraEm = pedido.getReservaExpiraEm();
+        setField(pedido, "atualizadoEm", LocalDateTime.now().minusMinutes(60));
+        when(clienteRepository.findById(clienteId)).thenReturn(Optional.of(pedido.getCliente()));
+        when(carrinhoRepository.findByIdAndClienteId(1L, clienteId)).thenReturn(Optional.of(pedido.getCarrinho()));
+        when(pedidoRepository.findFirstByCarrinhoIdAndClienteIdAndStatusInOrderByCriadoEmDesc(
+            1L, clienteId, Set.of(StatusPedido.PENDENTE, StatusPedido.AGUARDANDO_PAGAMENTO,
+                StatusPedido.EM_CHECKOUT))).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(pedido)).thenReturn(pedido);
+
+        var response = service.iniciar(iniciarRequest());
+
+        assertEquals("EM_CHECKOUT", response.getStatus());
+        assertEquals(reservaExpiraEm, pedido.getReservaExpiraEm());
+        verify(pedidoRepository, never()).delete(pedido);
+        verify(estoqueRepository, never()).findWithLockByLivroId(any());
     }
 
     private Cliente cliente() throws Exception {
@@ -671,7 +691,9 @@ class PedidoServiceTest {
 
     private Pedido pedidoSemItens() {
         Pedido pedido = new Pedido();
-        pedido.setCliente(new Cliente("Cliente", "cliente@email.com", "11999999999"));
+        Cliente cliente = new Cliente("Cliente", "cliente@email.com", "11999999999");
+        setId(cliente, clienteId);
+        pedido.setCliente(cliente);
         pedido.setCarrinho(new Carrinho());
         pedido.setSubtotal(BigDecimal.ZERO);
         pedido.setDesconto(BigDecimal.ZERO);
@@ -713,10 +735,14 @@ class PedidoServiceTest {
         return request;
     }
 
-    private void setId(Object target, Object id) throws Exception {
-        Field field = target.getClass().getDeclaredField("id");
-        field.setAccessible(true);
-        field.set(target, id);
+    private void setId(Object target, Object id) {
+        try {
+            Field field = target.getClass().getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(target, id);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("Nao foi possivel definir o id do objeto de teste", exception);
+        }
     }
 
     private void setField(Object target, String name, Object value) throws Exception {

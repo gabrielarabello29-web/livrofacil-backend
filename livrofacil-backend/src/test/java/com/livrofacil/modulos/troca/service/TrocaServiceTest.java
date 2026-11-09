@@ -76,8 +76,8 @@ class TrocaServiceTest {
 
         var response = service.receber(41L, false);
 
-        assertEquals("CONCLUIDA", response.getStatus());
-        assertEquals(StatusPedido.FINALIZADO, pedido.getStatus());
+        assertEquals("TROCADO", response.getStatus());
+        assertEquals(StatusPedido.ENTREGUE, pedido.getStatus());
         assertTrue(response.getVoucherCodigo().startsWith("TR-"));
         assertEquals(new BigDecimal("25.00"), response.getVoucherValor());
     }
@@ -139,7 +139,7 @@ class TrocaServiceTest {
 
         var response = service.solicitar(request);
 
-        assertEquals("SOLICITADA", response.getStatus());
+        assertEquals("EM_TROCA", response.getStatus());
         assertEquals("DEVOLUCAO", response.getTipo());
         assertEquals(1, response.getQuantidadeSolicitada());
     }

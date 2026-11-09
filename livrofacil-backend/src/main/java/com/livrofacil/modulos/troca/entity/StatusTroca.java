@@ -1,12 +1,15 @@
 package com.livrofacil.modulos.troca.entity;
 
 public enum StatusTroca {
+    EM_TROCA,
+    TROCA_AUTORIZADA,
+    RECEBIDA,
+    TROCADO,
+    RECUSADA,
+    // Valores antigos mantidos para leitura durante a migração de dados.
     SOLICITADA,
     AGUARDANDO_RECEBIMENTO,
-    RECEBIDA,
     CONCLUIDA,
-    // Mantidos para leitura de registros produzidos pela versão anterior.
     AUTORIZADA,
-    RECUSADA,
     TROCADA
 }

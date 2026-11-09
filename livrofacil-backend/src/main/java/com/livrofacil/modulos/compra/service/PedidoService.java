@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,15 +49,19 @@ public class PedidoService {
     private static final Set<StatusPedido> STATUS_CHECKOUT_PENDENTE = EnumSet.of(
             StatusPedido.PENDENTE,
             StatusPedido.AGUARDANDO_PAGAMENTO,
-            StatusPedido.EM_CHECKOUT,
-            StatusPedido.EM_PROCESSAMENTO
+            StatusPedido.EM_CHECKOUT
     );
-            private static final Set<StatusPedido> STATUS_RESERVA = EnumSet.of(
-                StatusPedido.PENDENTE,
-                StatusPedido.AGUARDANDO_PAGAMENTO,
-                StatusPedido.EM_CHECKOUT,
-                StatusPedido.EM_PROCESSAMENTO
-            );
+        private static final Set<StatusPedido> STATUS_RESERVA = EnumSet.copyOf(STATUS_CHECKOUT_PENDENTE);
+        private static final Set<StatusPedido> STATUS_CANCELAMENTO_CLIENTE = EnumSet.of(
+            StatusPedido.PENDENTE, StatusPedido.AGUARDANDO_PAGAMENTO,
+            StatusPedido.EM_CHECKOUT, StatusPedido.EM_PROCESSAMENTO
+        );
+        private static final Set<StatusPedido> STATUS_CANCELAMENTO_ADMIN = EnumSet.of(
+            StatusPedido.PENDENTE, StatusPedido.AGUARDANDO_PAGAMENTO,
+            StatusPedido.EM_CHECKOUT, StatusPedido.EM_PROCESSAMENTO,
+            StatusPedido.APROVADA, StatusPedido.PAGAMENTO_APROVADO, StatusPedido.EM_SEPARACAO
+        );
+        private static final Map<StatusPedido, Set<StatusPedido>> TRANSICOES_PERMITIDAS = criarTransicoesPermitidas();
     private final PedidoRepository pedidoRepository;
     private final CarrinhoRepository carrinhoRepository;
     private final ClienteRepository clienteRepository;
@@ -236,13 +241,18 @@ public class PedidoService {
         pedido.setCheckoutChave(null);
         pedido.atualizarAtividade();
         pedido.setReservaExpiraEm(null);
-        pedido.getItens().forEach(item -> estoqueRepository.findWithLockByLivroId(item.getLivro().getId()).ifPresent(estoque -> {
-            int quantidadeVendida = Math.min(item.getQuantidade(), Math.max(0, estoque.getQuantidadeBloqueada()));
-            if (quantidadeVendida <= 0) return;
-            estoque.setQuantidadeBloqueada(estoque.getQuantidadeBloqueada() - quantidadeVendida);
-            estoque.setQuantidadeVendida(estoque.getQuantidadeVendida() + quantidadeVendida);
+        pedido.getItens().forEach(item -> {
+            Estoque estoque = estoqueRepository.findWithLockByLivroId(item.getLivro().getId())
+                    .orElseThrow(() -> new RecursoNaoEncontradoException(
+                            "Estoque nao encontrado para o livro: " + item.getLivro().getId()));
+            if (estoque.getQuantidadeBloqueada() < item.getQuantidade()) {
+                throw new RegraDeNegocioException(
+                        "Estoque reservado inconsistente para o livro: " + item.getLivro().getId());
+            }
+            estoque.setQuantidadeBloqueada(estoque.getQuantidadeBloqueada() - item.getQuantidade());
+            estoque.setQuantidadeVendida(estoque.getQuantidadeVendida() + item.getQuantidade());
             estoqueRepository.save(estoque);
-        }));
+        });
         carrinho.getItens().clear();
         carrinhoRepository.save(carrinho);
         return new PedidoResponse(pedidoRepository.save(pedido), voucherSaldoGerado);
@@ -406,7 +416,7 @@ public class PedidoService {
 
     @Transactional
     public PedidoResponse atualizarStatus(Long pedidoId, StatusPedido status) {
-        Pedido pedido = buscarPedido(pedidoId);
+        Pedido pedido = buscarPedidoBloqueado(pedidoId);
         if (status == null) {
             throw new RegraDeNegocioException("O status e obrigatorio");
         }
@@ -414,6 +424,9 @@ public class PedidoService {
             return new PedidoResponse(pedido);
         }
         validarTransicaoStatus(pedido.getStatus(), status);
+        if (status == StatusPedido.REPROVADA) {
+            devolverUnidadesVendidas(pedido);
+        }
         if (status == StatusPedido.CANCELADO) {
             cancelarELiberar(pedido);
             return new PedidoResponse(pedidoRepository.save(pedido));
@@ -427,39 +440,33 @@ public class PedidoService {
     }
 
     private void validarTransicaoStatus(StatusPedido atual, StatusPedido novo) {
-        if (novo == StatusPedido.CANCELADO) {
-            return;
-        }
-        if (atual == StatusPedido.CANCELADO) {
-            throw new RegraDeNegocioException("Pedido cancelado nao pode receber novo status");
-        }
-        if (novo.ordinal() < atual.ordinal()) {
-            throw new RegraDeNegocioException("O status do pedido nao pode retroceder");
-        }
-        if (novo.ordinal() != atual.ordinal() + 1) {
+        if (!TRANSICOES_PERMITIDAS.getOrDefault(atual, Set.of()).contains(novo)) {
             throw new RegraDeNegocioException("Transicao de status invalida: " + atual + " -> " + novo);
         }
     }
 
     @Transactional
     public PedidoResponse cancelarCliente(Long pedidoId, UUID clienteId) {
-        Pedido pedido = buscarPedidoCliente(pedidoId, clienteId);
+        Pedido pedido = pedidoRepository.findByIdForUpdate(pedidoId)
+            .filter(pedidoEncontrado -> pedidoEncontrado.getCliente() != null
+                && clienteId.equals(pedidoEncontrado.getCliente().getId()))
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido nao encontrado: " + pedidoId));
         if (pedido.getStatus() == StatusPedido.CANCELADO) {
             return new PedidoResponse(pedido);
         }
-        if (pedido.getStatus().ordinal() >= StatusPedido.EM_ROTA_DE_ENTREGA.ordinal()) throw new RegraDeNegocioException("O pedido esta em rota e precisa de solicitacao administrativa");
+        if (!STATUS_CANCELAMENTO_CLIENTE.contains(pedido.getStatus())) {
+            throw new RegraDeNegocioException("Este pedido nao pode mais ser cancelado pelo cliente.");
+        }
         cancelarELiberar(pedido);
         return new PedidoResponse(pedidoRepository.save(pedido));
     }
 
     private void cancelarELiberar(Pedido pedido) {
-        if (pedido.getReservaExpiraEm() != null) pedido.getItens().forEach(item -> estoqueRepository.findWithLockByLivroId(item.getLivro().getId()).ifPresent(estoque -> {
-            int quantidadeLiberada = Math.min(item.getQuantidade(), Math.max(0, estoque.getQuantidadeBloqueada()));
-            if (quantidadeLiberada <= 0) return;
-            estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + quantidadeLiberada);
-            estoque.setQuantidadeBloqueada(estoque.getQuantidadeBloqueada() - quantidadeLiberada);
-            estoqueRepository.save(estoque);
-        }));
+        if (STATUS_RESERVA.contains(pedido.getStatus())) {
+            liberarReservaSeExistir(pedido);
+        } else {
+            devolverUnidadesVendidas(pedido);
+        }
         pedido.setStatus(StatusPedido.CANCELADO);
         pedido.setCheckoutChave(null);
         pedido.setReservaExpiraEm(null);
@@ -468,12 +475,65 @@ public class PedidoService {
         pedido.atualizarAtividade();
     }
 
+    private void liberarReservaSeExistir(Pedido pedido) {
+        pedido.getItens().forEach(item -> estoqueRepository.findWithLockByLivroId(item.getLivro().getId()).ifPresent(estoque -> {
+            int quantidadeLiberada = Math.min(item.getQuantidade(), Math.max(0, estoque.getQuantidadeBloqueada()));
+            if (quantidadeLiberada <= 0) return;
+            estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + quantidadeLiberada);
+            estoque.setQuantidadeBloqueada(estoque.getQuantidadeBloqueada() - quantidadeLiberada);
+            estoqueRepository.save(estoque);
+        }));
+        pedido.setReservaExpiraEm(null);
+    }
+
+    /** Reverses the stock sale once for a rejected or pre-shipment cancelled order. */
+    private void devolverUnidadesVendidas(Pedido pedido) {
+        Map<Long, Integer> quantidadesPorLivro = new TreeMap<>();
+        pedido.getItens().forEach(item -> quantidadesPorLivro.merge(
+                item.getLivro().getId(), item.getQuantidade(), Integer::sum));
+        quantidadesPorLivro.forEach((livroId, quantidade) -> {
+            Estoque estoque = estoqueRepository.findWithLockByLivroId(livroId)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Estoque nao encontrado para o livro: " + livroId));
+            if (estoque.getQuantidadeVendida() < quantidade) {
+                throw new RegraDeNegocioException("Estoque vendido inconsistente para o livro: " + livroId);
+            }
+            estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + quantidade);
+            estoque.setQuantidadeVendida(estoque.getQuantidadeVendida() - quantidade);
+            estoqueRepository.save(estoque);
+        });
+    }
+
+    private static Map<StatusPedido, Set<StatusPedido>> criarTransicoesPermitidas() {
+        Map<StatusPedido, Set<StatusPedido>> transicoes = new EnumMap<>(StatusPedido.class);
+        transicoes.put(StatusPedido.PENDENTE, EnumSet.of(StatusPedido.AGUARDANDO_PAGAMENTO,
+            StatusPedido.EM_CHECKOUT));
+        transicoes.put(StatusPedido.AGUARDANDO_PAGAMENTO, EnumSet.of(StatusPedido.EM_CHECKOUT,
+            StatusPedido.EM_PROCESSAMENTO));
+        transicoes.put(StatusPedido.EM_CHECKOUT, EnumSet.of(StatusPedido.EM_PROCESSAMENTO));
+        transicoes.put(StatusPedido.EM_PROCESSAMENTO, EnumSet.of(StatusPedido.APROVADA,
+            StatusPedido.REPROVADA));
+        transicoes.put(StatusPedido.APROVADA, EnumSet.of(StatusPedido.EM_TRANSPORTE));
+        transicoes.put(StatusPedido.EM_TRANSPORTE, EnumSet.of(StatusPedido.ENTREGUE));
+
+        // Temporary compatibility transitions for rows if a database has not run V4 yet.
+        transicoes.put(StatusPedido.PAGAMENTO_APROVADO, EnumSet.of(StatusPedido.EM_TRANSPORTE));
+        transicoes.put(StatusPedido.EM_SEPARACAO, EnumSet.of(StatusPedido.EM_TRANSPORTE));
+        transicoes.put(StatusPedido.NA_TRANSPORTADORA, EnumSet.of(StatusPedido.ENTREGUE));
+        transicoes.put(StatusPedido.EM_ROTA_DE_ENTREGA, EnumSet.of(StatusPedido.ENTREGUE));
+        STATUS_CANCELAMENTO_ADMIN.forEach(status -> transicoes.computeIfAbsent(status,
+            ignored -> EnumSet.noneOf(StatusPedido.class)).add(StatusPedido.CANCELADO));
+        return Map.copyOf(transicoes);
+    }
+
     @Scheduled(fixedDelay = 60000)
     @Transactional
     public void expirarReservas() {
-        LocalDateTime limite = LocalDateTime.now().minusMinutes(expiracaoCheckoutMinutos);
-        pedidoRepository.findByStatusInAndAtualizadoEmBefore(STATUS_RESERVA, limite).forEach(pedido -> {
-            cancelarELiberar(pedido);
+        LocalDateTime agora = LocalDateTime.now();
+        pedidoRepository.findByStatusInAndReservaExpiraEmBefore(STATUS_RESERVA, agora).forEach(pedido -> {
+            liberarReservaSeExistir(pedido);
+            pedido.setStatus(StatusPedido.CANCELADO);
+            pedido.setCheckoutChave(null);
+            pedido.atualizarAtividade();
             pedidoRepository.delete(pedido);
         });
     }
@@ -484,8 +544,8 @@ public class PedidoService {
                 .orElse(null);
         if (pedido == null) return null;
 
-        if (pedido.getAtualizadoEm() == null
-                || pedido.getAtualizadoEm().isBefore(LocalDateTime.now().minusMinutes(expiracaoCheckoutMinutos))) {
+        if (pedido.getReservaExpiraEm() == null
+            || pedido.getReservaExpiraEm().isBefore(LocalDateTime.now())) {
             cancelarELiberar(pedido);
             pedidoRepository.delete(pedido);
             return null;
@@ -525,7 +585,12 @@ public class PedidoService {
     }
 
     private Pedido buscarPedido(Long id) { return pedidoRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Pedido nao encontrado: " + id)); }
-    private Pedido buscarPedidoCliente(Long id, UUID clienteId) { return pedidoRepository.findByIdAndClienteId(id, clienteId).orElseThrow(() -> new RecursoNaoEncontradoException("Pedido nao encontrado: " + id)); }
+    private Pedido buscarPedidoBloqueado(Long id) { return pedidoRepository.findByIdForUpdate(id).orElseThrow(() -> new RecursoNaoEncontradoException("Pedido nao encontrado: " + id)); }
+    private Pedido buscarPedidoCliente(Long id, UUID clienteId) {
+        return pedidoRepository.findByIdAndClienteId(id, clienteId)
+                .or(() -> pedidoRepository.findByIdForUpdate(id).filter(pedido -> pedido.getCliente() != null && clienteId.equals(pedido.getCliente().getId())))
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido nao encontrado: " + id));
+    }
     private BigDecimal calcularDesconto(String codigo, BigDecimal subtotal) {
         if (codigo == null || codigo.isBlank()) return BigDecimal.ZERO;
         Cupom cupom = cupomRepository.findByCodigoIgnoreCaseAndAtivoTrue(codigo)

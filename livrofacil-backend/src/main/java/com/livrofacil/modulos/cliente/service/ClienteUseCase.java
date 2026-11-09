@@ -33,6 +33,9 @@ public class ClienteUseCase {
             StatusPedido.AGUARDANDO_PAGAMENTO,
             StatusPedido.EM_CHECKOUT,
             StatusPedido.EM_PROCESSAMENTO,
+            StatusPedido.APROVADA,
+            StatusPedido.EM_TRANSPORTE,
+            // Legacy names remain active until all databases have applied V4.
             StatusPedido.PAGAMENTO_APROVADO,
             StatusPedido.EM_SEPARACAO,
             StatusPedido.NA_TRANSPORTADORA,

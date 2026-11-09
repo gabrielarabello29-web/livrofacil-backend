@@ -76,6 +76,11 @@ public class CheckoutSchemaMigration {
             """, String.class).forEach(nome -> jdbcTemplate.execute(
             "alter table pedido drop constraint if exists \"" + nome.replace("\"", "\"\"") + "\""));
 
+          adicionarConstraint("pedido", "ck_pedido_status_validos",
+            "CHECK (ped_status IN ('PENDENTE', 'AGUARDANDO_PAGAMENTO', 'EM_CHECKOUT', " +
+            "'EM_PROCESSAMENTO', 'APROVADA', 'REPROVADA', 'EM_TRANSPORTE', 'ENTREGUE', " +
+            "'FINALIZADO', 'CANCELADO'))");
+
         // Regra legada: o item atual referencia o livro e nao possui titulo proprio.
         Integer tituloRemovido = jdbcTemplate.queryForObject("""
           select count(*)
@@ -165,11 +170,23 @@ public class CheckoutSchemaMigration {
                 EXECUTE format('ALTER TABLE public.troca DROP CONSTRAINT %I', constraint_record.conname);
               END LOOP;
 
+              UPDATE public.troca
+              SET tro_status = CASE tro_status
+                WHEN 'SOLICITADA' THEN 'EM_TROCA'
+                WHEN 'AGUARDANDO_RECEBIMENTO' THEN 'TROCA_AUTORIZADA'
+                WHEN 'AUTORIZADA' THEN 'TROCA_AUTORIZADA'
+                WHEN 'CONCLUIDA' THEN 'TROCADO'
+                WHEN 'TROCADA' THEN 'TROCADO'
+                ELSE tro_status
+              END
+              WHERE tro_status IN (
+                'SOLICITADA', 'AGUARDANDO_RECEBIMENTO', 'AUTORIZADA', 'CONCLUIDA', 'TROCADA'
+              );
+
               ALTER TABLE public.troca DROP CONSTRAINT IF EXISTS ck_troca_status_validos;
               ALTER TABLE public.troca ADD CONSTRAINT ck_troca_status_validos
                 CHECK (tro_status IN (
-                  'SOLICITADA', 'AGUARDANDO_RECEBIMENTO', 'RECEBIDA', 'CONCLUIDA',
-                  'AUTORIZADA', 'RECUSADA', 'TROCADA'
+                  'EM_TROCA', 'TROCA_AUTORIZADA', 'RECEBIDA', 'TROCADO', 'RECUSADA'
                 ));
             END IF;
           END $$

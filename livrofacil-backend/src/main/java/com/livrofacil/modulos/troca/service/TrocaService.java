@@ -34,8 +34,10 @@ import java.util.UUID;
 @Service
 public class TrocaService {
     private static final EnumSet<StatusTroca> STATUS_CONFLITANTES = EnumSet.of(
+        StatusTroca.EM_TROCA, StatusTroca.TROCA_AUTORIZADA, StatusTroca.RECEBIDA,
+        StatusTroca.TROCADO,
         StatusTroca.SOLICITADA, StatusTroca.AUTORIZADA, StatusTroca.AGUARDANDO_RECEBIMENTO,
-        StatusTroca.RECEBIDA, StatusTroca.TROCADA, StatusTroca.CONCLUIDA);
+        StatusTroca.TROCADA, StatusTroca.CONCLUIDA);
 
     private final TrocaRepository trocaRepository;
     private final PedidoRepository pedidoRepository;
@@ -175,18 +177,18 @@ public class TrocaService {
     @Transactional
     public TrocaResponse autorizar(Long trocaId) {
         Troca troca = buscarTrocaBloqueada(trocaId);
-        exigirStatus(troca, StatusTroca.SOLICITADA);
-        troca.setStatus(StatusTroca.AGUARDANDO_RECEBIMENTO);
+        exigirStatus(troca, StatusTroca.EM_TROCA);
+        troca.setStatus(StatusTroca.TROCA_AUTORIZADA);
         troca.setDecididoEm(LocalDateTime.now(zoneId));
         Troca salva = trocaRepository.save(troca);
-        registrarHistorico(salva, "AGUARDANDO_RECEBIMENTO", "Solicitacao autorizada; aguardando recebimento");
+        registrarHistorico(salva, "TROCA_AUTORIZADA", "Solicitacao autorizada; aguardando recebimento");
         return new TrocaResponse(salva);
     }
 
     @Transactional
     public TrocaResponse recusar(Long trocaId, String motivo) {
         Troca troca = buscarTrocaBloqueada(trocaId);
-        exigirStatus(troca, StatusTroca.SOLICITADA);
+        exigirStatus(troca, StatusTroca.EM_TROCA);
         troca.setStatus(StatusTroca.RECUSADA);
         troca.setMotivoRecusa(motivo.trim());
         troca.setDecididoEm(LocalDateTime.now(zoneId));
@@ -198,7 +200,9 @@ public class TrocaService {
     @Transactional
     public TrocaResponse receber(Long trocaId, boolean retornarEstoque) {
         Troca troca = buscarTrocaBloqueada(trocaId);
-        if (troca.getStatus() != StatusTroca.AGUARDANDO_RECEBIMENTO && troca.getStatus() != StatusTroca.AUTORIZADA) {
+        if (troca.getStatus() != StatusTroca.TROCA_AUTORIZADA &&
+            troca.getStatus() != StatusTroca.AGUARDANDO_RECEBIMENTO &&
+            troca.getStatus() != StatusTroca.AUTORIZADA) {
             throw new RegraDeNegocioException("A solicitacao deve estar autorizada e aguardando recebimento");
         }
         return concluirRecebimento(troca, retornarEstoque,
@@ -208,7 +212,9 @@ public class TrocaService {
     @Transactional
     public TrocaResponse receber(Long trocaId, boolean retornarEstoque, Integer quantidadeRecebida) {
         Troca troca = buscarTrocaBloqueada(trocaId);
-        if (troca.getStatus() != StatusTroca.AGUARDANDO_RECEBIMENTO && troca.getStatus() != StatusTroca.AUTORIZADA) {
+        if (troca.getStatus() != StatusTroca.TROCA_AUTORIZADA &&
+            troca.getStatus() != StatusTroca.AGUARDANDO_RECEBIMENTO &&
+            troca.getStatus() != StatusTroca.AUTORIZADA) {
             throw new RegraDeNegocioException("A solicitacao deve estar autorizada e aguardando recebimento");
         }
         return concluirRecebimento(troca, retornarEstoque, quantidadeRecebida);
@@ -229,8 +235,11 @@ public class TrocaService {
             var item = troca.getItemPedido();
             var estoque = estoqueRepository.findWithLockByLivroId(item.getLivro().getId())
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Estoque nao encontrado para o livro devolvido"));
+            if (estoque.getQuantidadeVendida() < quantidadeRecebida) {
+                throw new RegraDeNegocioException("Estoque vendido inconsistente para o livro devolvido");
+            }
             estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + quantidadeRecebida);
-            estoque.setQuantidadeVendida(Math.max(0, estoque.getQuantidadeVendida() - quantidadeRecebida));
+            estoque.setQuantidadeVendida(estoque.getQuantidadeVendida() - quantidadeRecebida);
             estoqueRepository.save(estoque);
         }
 
@@ -242,12 +251,9 @@ public class TrocaService {
         voucher.setTroca(troca);
         troca.setVoucher(voucher);
         troca.setCreditoEm(LocalDateTime.now(zoneId));
-        troca.setStatus(StatusTroca.CONCLUIDA);
-        // Finalize the original order only after the exchange credit is attached;
-        // the surrounding transaction keeps order, voucher, stock, and history atomic.
-        troca.getPedido().setStatus(com.livrofacil.modulos.compra.entity.StatusPedido.FINALIZADO);
+        troca.setStatus(StatusTroca.TROCADO);
         Troca salva = trocaRepository.save(troca);
-        registrarHistorico(salva, "CONCLUIDA", "Crédito emitido: " + voucher.getValor());
+        registrarHistorico(salva, "TROCADO", "Crédito emitido: " + voucher.getValor());
         return new TrocaResponse(salva);
     }
 
