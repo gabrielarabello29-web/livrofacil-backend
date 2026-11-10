@@ -5,11 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import jakarta.persistence.LockModeType;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface EstoqueRepository extends JpaRepository<Estoque, Long> {
 
     Optional<Estoque> findByLivroId(Long livroId);
+
+    List<Estoque> findByLivro_IdIn(List<Long> livroIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Estoque> findWithLockByLivroId(Long livroId);

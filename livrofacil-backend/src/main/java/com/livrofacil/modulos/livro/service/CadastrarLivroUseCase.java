@@ -25,9 +25,13 @@ import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CadastrarLivroUseCase {
@@ -59,10 +63,10 @@ public class CadastrarLivroUseCase {
 	public LivroResponse criar(LivroRequest request) {
 		validarDadosUnicos(request.getCodigo(), request.getIsbn(), request.getCodigoBarras(), null);
 
-		Autor autor = buscarAutor(request.getAutorId());
-		Editora editora = buscarEditora(request.getEditoraId());
-		GrupoPrecificacao grupoPrecificacao = buscarGrupoPrecificacao(request.getGrupoPrecificacaoId());
-		Set<Categoria> categorias = buscarCategorias(request.getCategoriaIds());
+		Autor autor = resolverAutor(request);
+		Editora editora = resolverEditora(request);
+		GrupoPrecificacao grupoPrecificacao = resolverGrupoPrecificacao(request);
+		Set<Categoria> categorias = resolverCategorias(request);
 		Dimensao dimensao = converterDimensao(request.getDimensao());
 
 		Livro livro = new Livro(
@@ -91,16 +95,36 @@ public class CadastrarLivroUseCase {
 
 	@Transactional(readOnly = true)
 	public List<LivroResponse> listar() {
-		return livroRepository.findAll().stream()
-				.map(livro -> new LivroResponse(livro, estoqueRepository.findByLivroId(livro.getId()).orElse(null)))
-				.toList();
+		return listar(null, null, null, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<LivroResponse> listar(Long autorId, Long editoraId) {
+		return listar(autorId, editoraId, null, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<LivroResponse> listar(Long autorId, Long editoraId, Long categoriaId, Long grupoPrecificacaoId) {
+		List<Livro> livros;
+		if (autorId != null && editoraId != null) {
+			livros = livroRepository.findByAutor_IdAndEditora_Id(autorId, editoraId);
+		} else if (autorId != null) {
+			livros = livroRepository.findByAutor_Id(autorId);
+		} else if (editoraId != null) {
+			livros = livroRepository.findByEditora_Id(editoraId);
+		} else if (categoriaId != null) {
+			livros = livroRepository.findByCategorias_Id(categoriaId);
+		} else if (grupoPrecificacaoId != null) {
+			livros = livroRepository.findByGrupoPrecificacao_Id(grupoPrecificacaoId);
+		} else {
+			livros = livroRepository.findAll();
+		}
+		return mapearLivrosComEstoque(livros);
 	}
 
 	@Transactional(readOnly = true)
 	public List<LivroResponse> listarAtivos() {
-		return livroRepository.findByAtivoTrue().stream()
-				.map(livro -> new LivroResponse(livro, estoqueRepository.findByLivroId(livro.getId()).orElse(null)))
-				.toList();
+		return mapearLivrosComEstoque(livroRepository.findByAtivoTrue());
 	}
 
 	@Transactional(readOnly = true)
@@ -134,29 +158,79 @@ public class CadastrarLivroUseCase {
 
 	@Transactional(readOnly = true)
 	public List<LivroResponse> buscarPorTitulo(String titulo) {
-		return livroRepository.findByTituloContainingIgnoreCase(titulo).stream()
-				.map(livro -> new LivroResponse(livro, estoqueRepository.findByLivroId(livro.getId()).orElse(null)))
+		return mapearLivrosComEstoque(livroRepository.findByTituloContainingIgnoreCase(titulo));
+	}
+
+	private List<LivroResponse> mapearLivrosComEstoque(List<Livro> livros) {
+		if (livros.isEmpty()) {
+			return List.of();
+		}
+		Map<Long, Estoque> estoquesPorLivro = estoqueRepository.findByLivro_IdIn(
+				livros.stream().map(Livro::getId).toList())
+				.stream()
+				.collect(Collectors.toMap(estoque -> estoque.getLivro().getId(), Function.identity()));
+		return livros.stream()
+				.map(livro -> new LivroResponse(livro, estoquesPorLivro.get(livro.getId())))
 				.toList();
 	}
 
 	@Transactional(readOnly = true)
-	public List<LivroOpcaoResponse> listarAutores() {
-		return autorRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+	public List<LivroOpcaoResponse> listarAutores(String nome) {
+		List<Autor> autores = nome == null || nome.isBlank()
+				? autorRepository.findAll()
+				: autorRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return autores.stream().map(LivroOpcaoResponse::new).toList();
 	}
 
 	@Transactional(readOnly = true)
-	public List<LivroOpcaoResponse> listarEditoras() {
-		return editoraRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+	public List<LivroOpcaoResponse> listarEditoras(String nome) {
+		List<Editora> editoras = nome == null || nome.isBlank()
+				? editoraRepository.findAll()
+				: editoraRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return editoras.stream().map(LivroOpcaoResponse::new).toList();
 	}
 
 	@Transactional(readOnly = true)
 	public List<LivroOpcaoResponse> listarCategorias() {
-		return categoriaRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+		return listarCategorias(null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<LivroOpcaoResponse> listarCategorias(String nome) {
+		List<Categoria> categorias = nome == null || nome.isBlank()
+				? categoriaRepository.findAll()
+				: categoriaRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return categorias.stream().map(LivroOpcaoResponse::new).toList();
 	}
 
 	@Transactional(readOnly = true)
 	public List<LivroOpcaoResponse> listarGruposPrecificacao() {
-		return grupoPrecificacaoRepository.findAll().stream().map(LivroOpcaoResponse::new).toList();
+		return listarGruposPrecificacao(null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<LivroOpcaoResponse> listarGruposPrecificacao(String nome) {
+		List<GrupoPrecificacao> grupos = nome == null || nome.isBlank()
+				? grupoPrecificacaoRepository.findAll()
+				: grupoPrecificacaoRepository.findByNomeContainingIgnoreCase(nome.trim());
+		return grupos.stream().map(LivroOpcaoResponse::new).toList();
+	}
+
+	@Transactional
+	public LivroOpcaoResponse criarCategoria(String nome) {
+		String nomeNormalizado = normalizarNome(nome, "O nome da categoria e obrigatorio");
+		Categoria categoria = categoriaRepository.findFirstByNomeIgnoreCase(nomeNormalizado)
+				.orElseGet(() -> categoriaRepository.save(new Categoria(nomeNormalizado)));
+		return new LivroOpcaoResponse(categoria);
+	}
+
+	@Transactional
+	public LivroOpcaoResponse criarGrupoPrecificacao(String nome, BigDecimal percentualMargem) {
+		String nomeNormalizado = normalizarNome(nome, "O nome do grupo de precificacao e obrigatorio");
+		BigDecimal percentual = percentualMargem == null ? BigDecimal.ZERO : percentualMargem;
+		GrupoPrecificacao grupo = grupoPrecificacaoRepository.findFirstByNomeIgnoreCase(nomeNormalizado)
+				.orElseGet(() -> grupoPrecificacaoRepository.save(new GrupoPrecificacao(nomeNormalizado, percentual)));
+		return new LivroOpcaoResponse(grupo);
 	}
 
 	@Transactional
@@ -164,10 +238,10 @@ public class CadastrarLivroUseCase {
 		Livro livro = buscarLivro(id);
 		validarDadosUnicos(request.getCodigo(), request.getIsbn(), request.getCodigoBarras(), id);
 
-		Autor autor = buscarAutor(request.getAutorId());
-		Editora editora = buscarEditora(request.getEditoraId());
-		GrupoPrecificacao grupoPrecificacao = buscarGrupoPrecificacao(request.getGrupoPrecificacaoId());
-		Set<Categoria> categorias = buscarCategorias(request.getCategoriaIds());
+		Autor autor = resolverAutor(request);
+		Editora editora = resolverEditora(request);
+		GrupoPrecificacao grupoPrecificacao = resolverGrupoPrecificacao(request);
+		Set<Categoria> categorias = resolverCategorias(request);
 		Dimensao dimensao = converterDimensao(request.getDimensao());
 
 		livro.setCodigo(request.getCodigo());
@@ -235,9 +309,34 @@ public class CadastrarLivroUseCase {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Autor nao encontrado: " + id));
 	}
 
+	private Autor resolverAutor(LivroRequest request) {
+		if (request.getAutorId() != null) {
+			return buscarAutor(request.getAutorId());
+		}
+		String nome = normalizarNome(request.getAutorNome(), "O nome do autor e obrigatorio");
+		return autorRepository.findFirstByNomeIgnoreCase(nome)
+				.orElseGet(() -> autorRepository.save(new Autor(nome)));
+	}
+
 	private Editora buscarEditora(Long id) {
 		return editoraRepository.findById(id)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Editora nao encontrada: " + id));
+	}
+
+	private Editora resolverEditora(LivroRequest request) {
+		if (request.getEditoraId() != null) {
+			return buscarEditora(request.getEditoraId());
+		}
+		String nome = normalizarNome(request.getEditoraNome(), "O nome da editora e obrigatorio");
+		return editoraRepository.findFirstByNomeIgnoreCase(nome)
+				.orElseGet(() -> editoraRepository.save(new Editora(nome)));
+	}
+
+	private String normalizarNome(String nome, String mensagemSeAusente) {
+		if (nome == null || nome.isBlank()) {
+			throw new RegraDeNegocioException(mensagemSeAusente);
+		}
+		return nome.trim();
 	}
 
 	private GrupoPrecificacao buscarGrupoPrecificacao(Long id) {
@@ -245,17 +344,47 @@ public class CadastrarLivroUseCase {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Grupo de precificacao nao encontrado: " + id));
 	}
 
-	private Set<Categoria> buscarCategorias(List<Long> ids) {
-		if (ids == null || ids.isEmpty()) {
-			throw new RegraDeNegocioException("O livro precisa ter pelo menos uma categoria");
+	private GrupoPrecificacao resolverGrupoPrecificacao(LivroRequest request) {
+		if (request.getGrupoPrecificacaoId() != null) {
+			return buscarGrupoPrecificacao(request.getGrupoPrecificacaoId());
 		}
-		if (ids.size() != ids.stream().distinct().count()) {
-			throw new RegraDeNegocioException("O livro nao pode possuir categorias duplicadas");
+		String nome = normalizarNome(request.getGrupoPrecificacaoNome(), "O nome do grupo de precificacao e obrigatorio");
+		BigDecimal percentual = request.getGrupoPrecificacaoPercentualMargem() == null
+				? BigDecimal.ZERO
+				: request.getGrupoPrecificacaoPercentualMargem();
+		return grupoPrecificacaoRepository.findFirstByNomeIgnoreCase(nome)
+				.orElseGet(() -> grupoPrecificacaoRepository.save(new GrupoPrecificacao(nome, percentual)));
+	}
+
+	private Set<Categoria> resolverCategorias(LivroRequest request) {
+		Set<Categoria> categorias = new HashSet<>();
+		Set<String> nomesNormalizados = new HashSet<>();
+
+		if (request.getCategoriaIds() != null) {
+			if (request.getCategoriaIds().size() != request.getCategoriaIds().stream().distinct().count()) {
+				throw new RegraDeNegocioException("O livro nao pode possuir categorias duplicadas");
+			}
+			List<Categoria> categoriasEncontradas = categoriaRepository.findAllById(request.getCategoriaIds());
+			if (categoriasEncontradas.size() != request.getCategoriaIds().size()) {
+				throw new RecursoNaoEncontradoException("Uma ou mais categorias nao foram encontradas");
+			}
+			categorias.addAll(categoriasEncontradas);
 		}
 
-		Set<Categoria> categorias = new HashSet<>(categoriaRepository.findAllById(ids));
-		if (categorias.size() != ids.size()) {
-			throw new RecursoNaoEncontradoException("Uma ou mais categorias nao foram encontradas");
+		if (request.getCategoriaNomes() != null) {
+			for (String nome : request.getCategoriaNomes()) {
+				String nomeNormalizado = normalizarNome(nome, "O nome da categoria e obrigatorio");
+				if (!nomesNormalizados.add(nomeNormalizado.toLowerCase())) {
+					throw new RegraDeNegocioException("O livro nao pode possuir categorias duplicadas");
+				}
+				Categoria categoria = categoriaRepository.findFirstByNomeIgnoreCase(nomeNormalizado)
+						.orElseGet(() -> categoriaRepository.save(new Categoria(nomeNormalizado)));
+				categorias.add(categoria);
+			}
+		}
+
+		if (categorias.isEmpty()) {
+			throw new RegraDeNegocioException("O livro precisa ter pelo menos uma categoria");
 		}
 		return categorias;
 	}
