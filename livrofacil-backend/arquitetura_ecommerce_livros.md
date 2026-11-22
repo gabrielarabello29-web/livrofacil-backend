@@ -22,7 +22,7 @@ Projeto de um e-commerce de livros baseado nos requisitos fornecidos pelo profes
 | Banco de dados | PostgreSQL |
 | Arquitetura | MVC |
 | Comunicação | API REST / JSON |
-| IA | API de IA generativa, como OpenAI |
+| IA | Gemini por meio do Vertex AI |
 | Autenticação | Planejada; ainda não implementada |
 
 A escolha de Java + Spring Boot é adequada para concentrar as regras de negócio, disponibilizar a API REST e integrar o banco e a IA.
@@ -820,15 +820,12 @@ IA Controller
    ↓
 IA Service
    ↓
-OpenAI / modelo externo
+Gemini via Vertex AI (`generateContent`)
 ```
 
-### Ainda não implementado
+### Aspectos ainda pendentes
 
-- integração real com API da OpenAI;
-- contexto do cliente e catálogo para recomendações;
-- chat funcional completo;
-- autenticação e contexto de usuário para IA.
+- autenticação de servidor e contexto de usuário confiável para IA.
 
 ---
 
@@ -1112,7 +1109,7 @@ Não será necessário desenvolver ou treinar um modelo de IA do zero.
                 ┌────────┘     └─────────┐
                 ▼                        ▼
         ┌──────────────┐          ┌─────────────┐
-        │ PostgreSQL   │          │  OpenAI API │
+        │ PostgreSQL   │          │ Vertex AI   │
         │              │          │             │
         │ Livros       │          │ IA          │
         │ Categorias   │          │ Generativa  │
@@ -1197,7 +1194,7 @@ Livros encontrados
 
               ↓
 
-OpenAI
+Gemini via Vertex AI
 "Com base nesses livros, responda ao cliente..."
 
               ↓
@@ -1492,9 +1489,9 @@ POST /api/chat
 
 ---
 
-# 17. Comunicação com a OpenAI
+# 17. Comunicação com Gemini pelo Vertex AI
 
-A chave da API deve ficar somente no back-end.
+A chamada é feita pelo back-end usando Application Default Credentials (ADC) e OAuth. Não há chave de API Gemini no cliente.
 
 ```text
 React
@@ -1503,7 +1500,7 @@ Spring Boot
   ↓
 AIService
   ↓
-OpenAI API
+Vertex AI `generateContent`
 ```
 
 Nunca:
@@ -1511,25 +1508,29 @@ Nunca:
 ```text
 React
   ↓
-OpenAI
+Gemini via Vertex AI
 ```
 
-A chave pode ser configurada através de variável de ambiente:
+O projeto, a região e o modelo podem ser configurados por variáveis de ambiente:
 
 ```text
-OPENAI_API_KEY=sua-chave
+GOOGLE_CLOUD_PROJECT=seu-projeto
+GOOGLE_CLOUD_LOCATION=us
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-Durante o desenvolvimento, o projeto pode funcionar completamente localmente:
+Para desenvolvimento local, configure ADC (por exemplo, `GOOGLE_APPLICATION_CREDENTIALS`). Em produção, prefira uma identidade gerenciada ou Workload Identity. A API Vertex AI deve estar habilitada no projeto e a identidade precisa de permissão de inferência.
+
+Durante o desenvolvimento, a aplicação pode funcionar localmente:
 
 ```text
 React      → localhost:5173
 Spring     → localhost:8080
 PostgreSQL → localhost:5432
-OpenAI     → API externa pela internet
+Vertex AI  → API externa autenticada via ADC
 ```
 
-O computador precisa apenas ter acesso à internet para realizar a chamada à API da OpenAI.
+O servidor precisa de acesso à internet e uma identidade Google Cloud autorizada para chamar o Vertex AI.
 
 ---
 
@@ -1597,7 +1598,7 @@ O cadastro de cliente atual é apenas demonstrativo e não possui senha. Regras 
                          │     │
                          ▼     ▼
                   ┌─────────┐ ┌──────────┐
-                  │PostgreSQL│ │ OpenAI  │
+                  │PostgreSQL│ │Vertex AI│
                   └─────────┘ └──────────┘
 ```
 
@@ -1682,7 +1683,7 @@ O cadastro de cliente atual é apenas demonstrativo e não possui senha. Regras 
           │                 └── IA
           │                       │
           │                       ▼
-          │                 OpenAI API
+          │                 Vertex AI / Gemini
           │
           └──────────── REST/JSON ─────────────┘
 ```
