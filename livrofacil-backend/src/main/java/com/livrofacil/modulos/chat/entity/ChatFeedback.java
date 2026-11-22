@@ -70,6 +70,10 @@ public class ChatFeedback {
         return mensagem;
     }
 
+    public Cliente getCliente() {
+        return cliente;
+    }
+
     public Avaliacao getAvaliacao() {
         return avaliacao;
     }

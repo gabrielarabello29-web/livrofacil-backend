@@ -46,7 +46,7 @@ import java.util.UUID;
 
 @Service
 public class ChatService {
-    private static final String INSTRUCAO = """
+    static final String INSTRUCAO = """
             Voce e o assistente de recomendacao de livros da LivroFacil. Responda em portugues brasileiro.
             Use somente os livros presentes no catalogo recebido e nao invente dados. Considere a mensagem,
             as preferencias literarias e compras concluidas do cliente. Se nao houver preferencias nem compras,
@@ -112,8 +112,8 @@ public class ChatService {
                 cliente.getId(), List.of(StatusPedido.ENTREGUE, StatusPedido.FINALIZADO));
         List<Livro> catalogo = filtrarCatalogo(preferencias);
 
-        String resposta = completionClient.completar(INSTRUCAO, contexto(
-                request.mensagem(), historico, preferencias, compras, catalogo));
+        String contextoModelo = contexto(request.mensagem(), historico, preferencias, compras, catalogo);
+        String resposta = completionClient.completar(INSTRUCAO, contextoModelo);
         JsonNode resultado;
         try {
             resultado = objectMapper.readTree(resposta);
@@ -142,6 +142,7 @@ public class ChatService {
         });
 
         ChatMensagem respostaIa = new ChatMensagem(sessao, ChatMensagem.Tipo.IA, texto);
+        respostaIa.setContextoJson(contextoModelo);
         respostaIa.getLivros().addAll(recomendados);
         mensagemRepository.save(respostaIa);
 

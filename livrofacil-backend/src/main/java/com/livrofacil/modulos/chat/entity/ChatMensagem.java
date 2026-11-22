@@ -46,6 +46,9 @@ public class ChatMensagem {
     @Column(name = "men_texto", nullable = false, columnDefinition = "text")
     private String texto;
 
+    @Column(name = "men_contexto_json", columnDefinition = "text")
+    private String contextoJson;
+
     @Column(name = "men_criado_em", nullable = false)
     private Instant criadoEm = Instant.now();
 
@@ -81,6 +84,14 @@ public class ChatMensagem {
 
     public String getTexto() {
         return texto;
+    }
+
+    public String getContextoJson() {
+        return contextoJson;
+    }
+
+    public void setContextoJson(String contextoJson) {
+        this.contextoJson = contextoJson;
     }
 
     public Instant getCriadoEm() {

@@ -143,6 +143,13 @@ class ChatServiceTest {
         assertEquals(123L, resposta.livros().get(0).livroId());
         assertEquals("/livros/123", resposta.livros().get(0).url());
         assertEquals("https://exemplo.com/capa.jpg", resposta.livros().get(0).imagemUrl());
+        org.mockito.ArgumentCaptor<ChatMensagem> mensagens =
+                org.mockito.ArgumentCaptor.forClass(ChatMensagem.class);
+        verify(mensagemRepository, org.mockito.Mockito.times(2)).save(mensagens.capture());
+        ChatMensagem respostaSalva = mensagens.getAllValues().get(1);
+        assertTrue(respostaSalva.getContextoJson() != null);
+        assertEquals("Quero um romance",
+                new ObjectMapper().readTree(respostaSalva.getContextoJson()).path("mensagemAtual").asText());
     }
 
     @Test

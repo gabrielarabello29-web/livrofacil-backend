@@ -62,6 +62,42 @@ A conversa é salva em `chat_sessao` e `chat_mensagem`; as respostas associam os
 }
 ```
 
+## Exportar dataset de treinamento (`JSONL`)
+
+`GET /api/chat/dataset.jsonl`
+
+Gera e baixa 100 exemplos de treino em `livrofacil-dataset-treino.jsonl`.
+`GET /api/chat/dataset/validation.jsonl` baixa 20 exemplos de validação em
+`livrofacil-dataset-validacao.jsonl`. Ambos usam JSON Lines no formato aceito pelo ajuste
+supervisionado Gemini no Vertex AI (`systemInstruction` e `contents`, com papéis `user`
+e `model`). A entrada usa a estrutura de contexto do chat; a resposta é o objeto JSON
+com `texto` e `livroIds`.
+
+O arquivo de treino contém 15 guardrails e o de validação contém 3, totalizando 15% em
+cada conjunto. Exemplos de feedback `UTIL` só são exportados quando a resposta possui
+um snapshot válido do contexto enviado ao Gemini e os livros recomendados continuam no
+catálogo ativo. Exemplos antigos sem snapshot são ignorados; o contexto não é reconstruído
+com preferências ou compras atuais.
+
+A exportação também inclui:
+
+- respostas marcadas como `UTIL`;
+- títulos e autores de pedidos concluídos (`ENTREGUE` ou `FINALIZADO`);
+- recomendações, sinopses e dúvidas sobre obras disponíveis no catálogo;
+- cenários de recomendação, sinopses, autoria e guardrail fora do escopo de livros.
+
+Mensagens reais e snapshots podem conter dados pessoais no texto ou no histórico; os
+arquivos precisam de revisão/anonimização manual antes de carregar em um bucket ou serviço
+de treinamento.
+
+Por padrão, as rotas exigem o cabeçalho `X-Dataset-Export-Token`. Configure
+`DATASET_EXPORT_TOKEN` com um segredo forte. Para uma demonstração somente local, inicie
+com o perfil Spring `demo`; esse perfil permite exportar sem token. Não use esse perfil
+em servidor acessível pela internet e não inclua o token no frontend nem no repositório.
+Sem token no perfil padrão, a exportação retorna `503`; com token ausente ou incorreto,
+retorna `403`. Respostas `UTIL` antigas sem snapshot de contexto são excluídas do treino;
+a migração V7 não preenche contexto retroativamente.
+
 ## Preferências literárias
 
 `GET /api/clientes/{clienteId}/preferencias-literarias`
