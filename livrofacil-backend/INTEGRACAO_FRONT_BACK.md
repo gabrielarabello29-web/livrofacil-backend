@@ -130,6 +130,28 @@ Configure no ambiente do servidor:
 
 Para desenvolvimento local, crie/ative ADC e garanta que o principal tenha permissão de inferência no projeto. Para produção, prefira a identidade de serviço do ambiente ou Workload Identity; não salve arquivos JSON de credenciais no repositório nem os envie ao front-end.
 
+### Configurar variáveis no PowerShell (Windows)
+
+As atribuições `$env:NOME = "valor"` valem apenas para a janela atual e para os processos iniciados por ela. Configure-as antes de iniciar o backend; ao fechar a janela, os valores deixam de existir. Substitua `SEU_PROJECT_ID` pelo ID do projeto Google Cloud:
+
+```powershell
+$env:GOOGLE_CLOUD_PROJECT = "SEU_PROJECT_ID"
+$env:GOOGLE_CLOUD_LOCATION = "us"
+$env:GEMINI_MODEL = "gemini-3.5-flash-lite"
+Set-Location .\livrofacil-backend
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=demo"
+```
+
+O perfil `demo` permite baixar os datasets sem `DATASET_EXPORT_TOKEN`; use-o somente em desenvolvimento local. Fora desse perfil, defina `DATASET_EXPORT_TOKEN` no ambiente antes de iniciar a aplicação e envie o valor apenas no cabeçalho `X-Dataset-Export-Token`. Não coloque tokens, senhas ou arquivos de credenciais em comandos compartilhados, no Git ou no front-end. Reinicie o backend depois de alterar variáveis para que a aplicação receba os novos valores.
+
+Para configurar um valor não secreto do projeto para futuras janelas do Windows, pode-se usar:
+
+```powershell
+[Environment]::SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", "SEU_PROJECT_ID", "User")
+```
+
+Essa configuração persistente só se aplica a novos processos; feche e abra um novo terminal antes de iniciar o backend.
+
 Ative a API Vertex AI (`aiplatform.googleapis.com`) no projeto e conceda à identidade usada pela aplicação a função `roles/aiplatform.user` (ou uma função personalizada com a permissão de previsão necessária). O cliente usa `generateContent` no endpoint correspondente à localização configurada e solicita saída JSON via `generationConfig.responseMimeType`. O padrão `us` usa o endpoint multi-região dos EUA, compatível com `gemini-3.5-flash-lite`; `global` usa o endpoint global, `eu` o endpoint multi-região europeu e regiões padrão usam o host regional.
 
 Projeto ou credenciais ADC ausentes retornam `503` no envelope padrão de erro. Falhas HTTP do Vertex AI ou respostas inválidas do Gemini retornam `502`. IDs inexistentes ou vínculos de outro cliente retornam `404`; validação de payload e categorias retorna `400`. A resposta de erro mantém os campos `status`, `erro`, `mensagem`, `erros`, `caminho` e `timestamp`.
