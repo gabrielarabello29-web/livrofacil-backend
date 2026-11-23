@@ -47,12 +47,27 @@ import java.util.UUID;
 @Service
 public class ChatService {
     static final String INSTRUCAO = """
-            Voce e o assistente de recomendacao de livros da LivroFacil. Responda em portugues brasileiro.
-            Use somente os livros presentes no catalogo recebido e nao invente dados. Considere a mensagem,
-            as preferencias literarias e compras concluidas do cliente. Se nao houver preferencias nem compras,
-            responda normalmente e, quando fizer sentido, pergunte sobre interesses. Recomende no maximo 5 livros.
+            Voce e o assistente de recomendacao de livros da Loja LivroFacil.
+            Responda em portugues brasileiro de forma clara, direta e natural.
+
+            Use somente os livros presentes no catalogo recebido e informe apenas dados presentes nesse catalogo.
+            Nunca invente titulo, autor, categoria, sinopse, preco, disponibilidade ou ID.
+            A recomendacao deve considerar a mensagem atual, o historico recente, as preferencias do cliente,
+            o historico de compras e a faixa de preco. Se o catalogo nao tiver livros adequados, diga isso e
+            pergunte somente a informacao essencial que falta; nao force uma recomendacao.
+
+            Entenda restricoes cotidianas com precisao:
+            - "passou de 20 reais", "ate 20 reais" ou equivalente significa preco no maximo R$ 20,00;
+            - "mais barato que 20 reais" significa preco menor que R$ 20,00;
+            - nao use um limite como menor que o informado quando o usuario disser "ate";
+            - "para ler no banho", "na praia" ou outras situacoes cotidianas nao significam que o livro
+              seja resistente a agua. Recomende somente pelo catalogo e nao atribua propriedades nao informadas.
+
+            Recomende no maximo 5 livros. Priorize correspondencia com genero, tema, preco e situacao da mensagem.
+            Evite repetir os mesmos livros de mensagens anteriores sem motivo.
+            Diga o motivo da recomendacao em uma ou duas frases curtas. Mostre apenas livros cujos IDs estejam no catalogo.
             Responda exclusivamente com um objeto JSON: {"texto":"resposta ao cliente","livroIds":[123]}.
-            livroIds deve conter apenas IDs numericos do catalogo fornecido.
+            "livroIds" deve conter apenas IDs numericos presentes no catalogo fornecido.
             """;
 
     private final ClienteRepository clienteRepository;
@@ -110,7 +125,7 @@ public class ChatService {
         PreferenciasLiterarias preferencias = preferenciasRepository.findByClienteId(cliente.getId()).orElse(null);
         List<ItemPedido> compras = itemPedidoRepository.buscarHistoricoConcluido(
                 cliente.getId(), List.of(StatusPedido.ENTREGUE, StatusPedido.FINALIZADO));
-        List<Livro> catalogo = filtrarCatalogo(preferencias);
+        List<Livro> catalogo = filtrarCatalogo(preferencias, request.mensagem());
 
         String contextoModelo = contexto(request.mensagem(), historico, preferencias, compras, catalogo);
         String resposta = completionClient.completar(INSTRUCAO, contextoModelo);
@@ -216,21 +231,46 @@ public class ChatService {
         return cliente;
     }
 
-    private List<Livro> filtrarCatalogo(PreferenciasLiterarias preferencias) {
+    private List<Livro> filtrarCatalogo(PreferenciasLiterarias preferencias, String mensagem) {
         List<Livro> livros = livroRepository.findDisponiveisAtivos(PageRequest.of(0, 100));
-        if (preferencias == null) {
+        BigDecimal limiteMensagem = limitePrecoMaximoMensagem(mensagem);
+
+        if (preferencias == null && limiteMensagem == null) {
             return livros;
         }
 
-        Set<Long> categoriaIds = preferencias.getCategorias().stream().map(Categoria::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> categoriaIds = preferencias == null ? Set.of()
+                : preferencias.getCategorias().stream().map(Categoria::getId).collect(java.util.stream.Collectors.toSet());
         return livros.stream()
-                .filter(livro -> preferencias.getPrecoMinimo() == null
+                .filter(livro -> preferencias == null || preferencias.getPrecoMinimo() == null
                         || livro.getValorVenda().compareTo(preferencias.getPrecoMinimo()) >= 0)
-                .filter(livro -> preferencias.getPrecoMaximo() == null
+                .filter(livro -> preferencias == null || preferencias.getPrecoMaximo() == null
                         || livro.getValorVenda().compareTo(preferencias.getPrecoMaximo()) <= 0)
+                .filter(livro -> limiteMensagem == null
+                        || livro.getValorVenda().compareTo(limiteMensagem) <= 0)
                 .filter(livro -> categoriaIds.isEmpty()
                         || livro.getCategorias().stream().anyMatch(categoria -> categoriaIds.contains(categoria.getId())))
                 .toList();
+    }
+
+    private BigDecimal limitePrecoMaximoMensagem(String mensagem) {
+        if (mensagem == null || mensagem.isBlank()) {
+            return null;
+        }
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                        "(?iu)(?:ate|até|no\\s+maximo|no\\s+m[áa]ximo|passou\\s+de|mais\\s+barato\\s+que|abaixo\\s+de|menos\\s+que|menor\\s+que)\\s*(?:r\\$\\s*)?(\\d+(?:[,.]\\d{1,2})?)"
+                )
+                .matcher(mensagem);
+        if (!matcher.find()) {
+            return null;
+        }
+
+        try {
+            return new BigDecimal(matcher.group(1).replace(".", "").replace(',', '.'));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private String contexto(
