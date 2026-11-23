@@ -12,7 +12,9 @@ import com.livrofacil.modulos.cliente.entity.Cliente;
 import com.livrofacil.modulos.cliente.repository.ClienteRepository;
 import com.livrofacil.exception.RecursoNaoEncontradoException;
 import com.livrofacil.exception.RegraDeNegocioException;
+import com.livrofacil.modulos.livro.entity.Estoque;
 import com.livrofacil.modulos.livro.entity.Livro;
+import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import com.livrofacil.modulos.livro.repository.LivroRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +26,16 @@ public class CarrinhoService {
     private final ItemCarrinhoRepository itemRepository;
     private final ClienteRepository clienteRepository;
     private final LivroRepository livroRepository;
+    private final EstoqueRepository estoqueRepository;
 
     public CarrinhoService(CarrinhoRepository carrinhoRepository, ItemCarrinhoRepository itemRepository,
-                           ClienteRepository clienteRepository, LivroRepository livroRepository) {
+                           ClienteRepository clienteRepository, LivroRepository livroRepository,
+                           EstoqueRepository estoqueRepository) {
         this.carrinhoRepository = carrinhoRepository;
         this.itemRepository = itemRepository;
         this.clienteRepository = clienteRepository;
         this.livroRepository = livroRepository;
+        this.estoqueRepository = estoqueRepository;
     }
 
     @Transactional
@@ -59,6 +64,16 @@ public class CarrinhoService {
         if (!Boolean.TRUE.equals(livro.getAtivo())) {
             throw new RegraDeNegocioException("O livro nao esta disponivel para compra");
         }
+
+        Estoque estoque = estoqueRepository.findByLivroId(livro.getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Estoque nao encontrado para o livro: " + livro.getId()));
+
+        Integer quantidadeExistente = itemRepository.findByCarrinhoIdAndLivroId(carrinhoId, request.getLivroId())
+                .map(ItemCarrinho::getQuantidade)
+                .orElse(0);
+        Integer quantidadeFinal = quantidadeExistente + request.getQuantidade();
+        validarQuantidadeDisponivel(livro.getId(), quantidadeFinal, estoque.getQuantidadeDisponivel());
+
         ItemCarrinho item = itemRepository.findByCarrinhoIdAndLivroId(carrinhoId, request.getLivroId()).orElseGet(() -> {
             ItemCarrinho novo = new ItemCarrinho();
             novo.setCarrinho(carrinho);
@@ -67,7 +82,7 @@ public class CarrinhoService {
             carrinho.getItens().add(novo);
             return novo;
         });
-        item.setQuantidade(item.getQuantidade() + request.getQuantidade());
+        item.setQuantidade(quantidadeFinal);
         carrinho.atualizarData();
         return new ItemCarrinhoResponse(itemRepository.save(item));
     }
@@ -80,6 +95,11 @@ public class CarrinhoService {
         Carrinho carrinho = buscarCarrinho(carrinhoId, clienteId, token);
         ItemCarrinho item = itemRepository.findByIdAndCarrinhoId(itemId, carrinho.getId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Item do carrinho nao encontrado: " + itemId));
+
+        Estoque estoque = estoqueRepository.findByLivroId(item.getLivro().getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Estoque nao encontrado para o livro: " + item.getLivro().getId()));
+        validarQuantidadeDisponivel(item.getLivro().getId(), quantidade, estoque.getQuantidadeDisponivel());
+
         item.setQuantidade(quantidade);
         carrinho.atualizarData();
         return new ItemCarrinhoResponse(itemRepository.save(item));
@@ -103,5 +123,14 @@ public class CarrinhoService {
             throw new RegraDeNegocioException("O carrinho nao pertence ao cliente informado");
         }
         return carrinho;
+    }
+
+    private void validarQuantidadeDisponivel(Long livroId, Integer quantidadeSolicitada, Integer quantidadeDisponivel) {
+        if (quantidadeSolicitada == null || quantidadeSolicitada <= 0) {
+            throw new RegraDeNegocioException("A quantidade deve ser maior que zero");
+        }
+        if (quantidadeDisponivel == null || quantidadeSolicitada > quantidadeDisponivel) {
+            throw new RegraDeNegocioException("Quantidade solicitada superior ao estoque disponível.");
+        }
     }
 }

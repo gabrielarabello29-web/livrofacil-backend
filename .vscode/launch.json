@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Launch Livrofacil Backend",
+      "request": "launch",
+      "mainClass": "com.livrofacil.LivrofacilBackendApplication",
+      "projectName": "livrofacil-backend"
+    }
+  ]
+}

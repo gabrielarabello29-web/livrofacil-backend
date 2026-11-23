@@ -30,6 +30,9 @@ public class FormaPagamento {
     @Column(name = "for_pag_ultimos_digitos", length = 4)
     private String ultimosDigitos;
 
+    @Column(name = "for_pag_codigo_seguranca", length = 4)
+    private String codigoSeguranca;
+
     @Column(name = "for_pag_validade", length = 5)
     private String validade;
 
@@ -54,9 +57,15 @@ public class FormaPagamento {
 
     public FormaPagamento(String nomeTitular, String tipoCartao, String ultimosDigitos, String validade,
                           String bandeira, boolean preferencial, Cliente cliente) {
+        this(nomeTitular, tipoCartao, ultimosDigitos, null, validade, bandeira, preferencial, cliente);
+    }
+
+    public FormaPagamento(String nomeTitular, String tipoCartao, String ultimosDigitos, String codigoSeguranca,
+                          String validade, String bandeira, boolean preferencial, Cliente cliente) {
         this.nomeTitular = nomeTitular;
         this.tipoCartao = tipoCartao;
         this.ultimosDigitos = ultimosDigitos;
+        this.codigoSeguranca = codigoSeguranca;
         this.validade = validade;
         this.bandeira = bandeira;
         this.preferencial = preferencial ? "S" : "N";
@@ -71,6 +80,8 @@ public class FormaPagamento {
     public void setTipoCartao(String tipoCartao) { this.tipoCartao = tipoCartao; }
     public String getUltimosDigitos() { return ultimosDigitos; }
     public void setUltimosDigitos(String ultimosDigitos) { this.ultimosDigitos = ultimosDigitos; }
+    public String getCodigoSeguranca() { return codigoSeguranca; }
+    public void setCodigoSeguranca(String codigoSeguranca) { this.codigoSeguranca = codigoSeguranca; }
     public String getValidade() { return validade; }
     public void setValidade(String validade) { this.validade = validade; }
     public String getBandeira() { return bandeira; }

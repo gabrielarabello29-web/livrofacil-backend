@@ -10,7 +10,9 @@ import com.livrofacil.modulos.compra.entity.Carrinho;
 import com.livrofacil.modulos.compra.entity.ItemCarrinho;
 import com.livrofacil.modulos.compra.repository.CarrinhoRepository;
 import com.livrofacil.modulos.compra.repository.ItemCarrinhoRepository;
+import com.livrofacil.modulos.livro.entity.Estoque;
 import com.livrofacil.modulos.livro.entity.Livro;
+import com.livrofacil.modulos.livro.repository.EstoqueRepository;
 import com.livrofacil.modulos.livro.repository.LivroRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,7 @@ class CarrinhoServiceTest {
     @Mock private ItemCarrinhoRepository itemRepository;
     @Mock private ClienteRepository clienteRepository;
     @Mock private LivroRepository livroRepository;
+    @Mock private EstoqueRepository estoqueRepository;
     @InjectMocks private CarrinhoService service;
 
     @Test
@@ -147,6 +150,7 @@ class CarrinhoServiceTest {
         ItemCarrinhoRequest request = itemRequest(1);
         when(carrinhoRepository.findById(1L)).thenReturn(Optional.of(carrinho));
         when(livroRepository.findById(1L)).thenReturn(Optional.of(livro));
+        when(estoqueRepository.findByLivroId(1L)).thenReturn(Optional.of(estoqueDisponivel(10)));
         when(itemRepository.findByCarrinhoIdAndLivroId(1L, 1L)).thenReturn(Optional.empty());
         when(itemRepository.save(any(ItemCarrinho.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -165,6 +169,7 @@ class CarrinhoServiceTest {
         item.setQuantidade(2);
         when(carrinhoRepository.findById(1L)).thenReturn(Optional.of(carrinho));
         when(livroRepository.findById(1L)).thenReturn(Optional.of(livro));
+        when(estoqueRepository.findByLivroId(1L)).thenReturn(Optional.of(estoqueDisponivel(10)));
         when(itemRepository.findByCarrinhoIdAndLivroId(1L, 1L)).thenReturn(Optional.of(item));
         when(itemRepository.save(item)).thenReturn(item);
 
@@ -187,6 +192,7 @@ class CarrinhoServiceTest {
         item.setQuantidade(1);
         when(carrinhoRepository.findById(1L)).thenReturn(Optional.of(carrinho));
         when(itemRepository.findByIdAndCarrinhoId(2L, 1L)).thenReturn(Optional.of(item));
+        when(estoqueRepository.findByLivroId(item.getLivro().getId())).thenReturn(Optional.of(estoqueDisponivel(10)));
         when(itemRepository.save(item)).thenReturn(item);
 
         var response = service.atualizarItem(1L, null, "token", 2L, 4);
@@ -255,6 +261,12 @@ class CarrinhoServiceTest {
         request.setLivroId(1L);
         request.setQuantidade(quantidade);
         return request;
+    }
+
+    private Estoque estoqueDisponivel(int quantidade) {
+        Estoque estoque = new Estoque();
+        estoque.setQuantidadeDisponivel(quantidade);
+        return estoque;
     }
 
     private void setId(Cliente cliente, UUID id) throws Exception {

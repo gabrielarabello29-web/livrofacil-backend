@@ -1,6 +1,9 @@
 package com.livrofacil.modulos.livro.repository;
 
 import com.livrofacil.modulos.livro.entity.Livro;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +29,22 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
 
     List<Livro> findByTituloContainingIgnoreCase(String titulo);
 
+    List<Livro> findByAutor_Id(Long autorId);
+
+    List<Livro> findByEditora_Id(Long editoraId);
+
+    List<Livro> findByCategorias_Id(Long categoriaId);
+
+    List<Livro> findByGrupoPrecificacao_Id(Long grupoPrecificacaoId);
+
+    List<Livro> findByAutor_IdAndEditora_Id(Long autorId, Long editoraId);
+
     List<Livro> findByAtivo(Boolean ativo);
 
     List<Livro> findByAtivoTrue();
+
+    @EntityGraph(attributePaths = {"autor"})
+    @Query("select distinct livro from Livro livro join Estoque estoque on estoque.livro = livro "
+            + "where livro.ativo = true and estoque.quantidadeDisponivel > 0 order by livro.id")
+    List<Livro> findDisponiveisAtivos(Pageable pageable);
 }

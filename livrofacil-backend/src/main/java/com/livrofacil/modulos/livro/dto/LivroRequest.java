@@ -1,6 +1,7 @@
 package com.livrofacil.modulos.livro.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -56,21 +57,30 @@ public class LivroRequest {
     @NotNull(message = "O status do livro e obrigatorio")
     private Boolean ativo;
 
-    @NotNull(message = "O autor e obrigatorio")
     @Positive(message = "O ID do autor deve ser maior que zero")
     private Long autorId;
 
-    @NotNull(message = "A editora e obrigatoria")
     @Positive(message = "O ID da editora deve ser maior que zero")
     private Long editoraId;
 
-    @NotNull(message = "O grupo de precificacao e obrigatorio")
+    @Size(max = 150, message = "O nome do autor deve ter no maximo 150 caracteres")
+    private String autorNome;
+
+    @Size(max = 150, message = "O nome da editora deve ter no maximo 150 caracteres")
+    private String editoraNome;
+
     @Positive(message = "O ID do grupo de precificacao deve ser maior que zero")
     private Long grupoPrecificacaoId;
 
-    @NotNull(message = "O livro precisa ter pelo menos uma categoria")
-    @Size(min = 1, message = "O livro precisa ter pelo menos uma categoria")
+    @Size(max = 150, message = "O nome do grupo de precificacao deve ter no maximo 150 caracteres")
+    private String grupoPrecificacaoNome;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "O percentual de margem deve ser maior que zero")
+    private BigDecimal grupoPrecificacaoPercentualMargem;
+
     private List<@NotNull(message = "O ID da categoria e obrigatorio") @Positive(message = "O ID da categoria deve ser maior que zero") Long> categoriaIds;
+
+    private List<@NotBlank(message = "O nome da categoria e obrigatorio") String> categoriaNomes;
 
     @Valid
     @NotNull(message = "As dimensoes do livro sao obrigatorias")
@@ -172,12 +182,28 @@ public class LivroRequest {
         this.autorId = autorId;
     }
 
+    public String getAutorNome() {
+        return autorNome;
+    }
+
+    public void setAutorNome(String autorNome) {
+        this.autorNome = autorNome;
+    }
+
     public Long getEditoraId() {
         return editoraId;
     }
 
     public void setEditoraId(Long editoraId) {
         this.editoraId = editoraId;
+    }
+
+    public String getEditoraNome() {
+        return editoraNome;
+    }
+
+    public void setEditoraNome(String editoraNome) {
+        this.editoraNome = editoraNome;
     }
 
     public Long getGrupoPrecificacaoId() {
@@ -188,12 +214,36 @@ public class LivroRequest {
         this.grupoPrecificacaoId = grupoPrecificacaoId;
     }
 
+    public String getGrupoPrecificacaoNome() {
+        return grupoPrecificacaoNome;
+    }
+
+    public void setGrupoPrecificacaoNome(String grupoPrecificacaoNome) {
+        this.grupoPrecificacaoNome = grupoPrecificacaoNome;
+    }
+
+    public BigDecimal getGrupoPrecificacaoPercentualMargem() {
+        return grupoPrecificacaoPercentualMargem;
+    }
+
+    public void setGrupoPrecificacaoPercentualMargem(BigDecimal grupoPrecificacaoPercentualMargem) {
+        this.grupoPrecificacaoPercentualMargem = grupoPrecificacaoPercentualMargem;
+    }
+
     public List<Long> getCategoriaIds() {
         return categoriaIds;
     }
 
     public void setCategoriaIds(List<Long> categoriaIds) {
         this.categoriaIds = categoriaIds;
+    }
+
+    public List<String> getCategoriaNomes() {
+        return categoriaNomes;
+    }
+
+    public void setCategoriaNomes(List<String> categoriaNomes) {
+        this.categoriaNomes = categoriaNomes;
     }
 
     public DimensaoRequest getDimensao() {

@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.livrofacil.modulos.chat.service.ChatProviderException;
+import com.livrofacil.modulos.chat.service.ChatRequestException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -50,6 +52,23 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return resposta(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(ChatRequestException.class)
+    public ResponseEntity<Map<String, Object>> tratarRequisicaoChatInvalida(
+            ChatRequestException exception,
+            HttpServletRequest request
+    ) {
+        return resposta(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(ChatProviderException.class)
+    public ResponseEntity<Map<String, Object>> tratarFalhaIntegracaoChat(
+            ChatProviderException exception,
+            HttpServletRequest request
+    ) {
+        String id = registrarErro(exception, request);
+        return resposta(exception.getStatus(), exception.getMessage(), request, Map.of("idErro", id));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
